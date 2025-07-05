@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# Data/model artifacts
+*.pkl
+*.csv
+
+# Mac/Windows system files
+.DS_Store
+Thumbs.db
