@@ -1,10 +1,13 @@
+
 import pandas as pd
 from io import StringIO
+import requests
+import re
+from langdetect import detect, LangDetectException
 
-def fetch_comments(token, post_id):
-    if token == "test" and post_id == "test":
-        # Return the sample DataFrame for testing
-        data = StringIO("""
+
+def load_test_comments():
+    data = StringIO("""
 comment_id,user_id,user_name,comment_text,created_time,like_count,love_count,haha_count,wow_count,sad_count,angry_count,care_count,reply_count,user_profile_link,user_gender,is_verified,language,parent_comment_id
 cmt_1,user_1,নুসরাত জাহান শিলা,"খুব সুন্দর লিখেছেন, মুগ্ধ হলাম। শুভকামনা।",2024-06-09 12:01:15,8,3,0,1,0,0,0,1,https://facebook.com/101001,Female,False,Bangla,
 cmt_2,user_2,John Abraham,"This is such an informative post. Thanks for sharing!",2024-06-09 12:05:50,5,2,0,0,0,0,1,0,https://facebook.com/101002,Male,False,English,
@@ -68,8 +71,152 @@ cmt_59,user_37,Tareq Aziz,"Lame! Eta dekhlei matha betha lage.",2024-06-09 15:15
 cmt_60,user_50,Arifur Rahman,"Stop the hate. Spread positivity.",2024-06-09 15:17:32,3,2,0,0,0,0,1,0,https://facebook.com/101050,Male,False,English,
 cmt_61,user_25,আবু বকর সিদ্দিক,"আমি তো কিছুই বুঝলাম না।",2024-06-09 15:19:07,1,0,0,0,0,1,0,0,https://facebook.com/101025,Male,False,Bangla,
 """)
-        df = pd.read_csv(data)
+    return pd.read_csv(data)
+
+
+
+
+
+
+
+def fetch_comments_from_facebook(token, post_url):
+    def extract_facebook_id(url):
+        match_photo = re.search(r'fbid=(\d+)', url)
+        match_video = re.search(r'/videos/(\d+)', url) or re.search(r'v=(\d+)', url)
+        if match_photo:
+            post_id = match_photo.group(1)
+            post_type = 'photo'
+        elif match_video:
+            post_id = match_video.group(1)
+            post_type = 'video'
+        else:
+            post_id = None
+            post_type = None
+        return post_id, post_type
+
+    def get_reaction_counts(comment_id, token):
+        types = ['LIKE', 'LOVE', 'HAHA', 'WOW', 'SAD', 'ANGRY', 'CARE']
+        counts = {}
+        for reaction in types:
+            url = f'https://graph.facebook.com/v19.0/{comment_id}/reactions'
+            params = {'type': reaction, 'summary': 'total_count', 'access_token': token}
+            try:
+                res = requests.get(url, params=params).json()
+                counts[f"{reaction.lower()}_count"] = res.get('summary', {}).get('total_count', 0)
+            except Exception as ex:
+                print(f"[WARN] Could not fetch reaction '{reaction}' for {comment_id}: {ex}")
+                counts[f"{reaction.lower()}_count"] = 0
+        return counts
+
+    def get_user_info(user_id, token):
+        url = f'https://graph.facebook.com/v19.0/{user_id}'
+        params = {'fields': 'link,gender,verified', 'access_token': token}
+        try:
+            res = requests.get(url, params=params).json()
+            return {
+                'user_profile_link': res.get('link', ''),
+                'user_gender': res.get('gender', ''),
+                'is_verified': res.get('verified', '')
+            }
+        except Exception as ex:
+            print(f"[WARN] Could not fetch user info for {user_id}: {ex}")
+            return {'user_profile_link': '', 'user_gender': '', 'is_verified': ''}
+
+    print(f"Fetching comments for URL: {post_url}")
+    post_id, post_type = extract_facebook_id(post_url)
+    if not post_id:
+        print(f"[ERROR] Could not extract post ID from: {post_url}")
+        return pd.DataFrame()
+
+    url = f'https://graph.facebook.com/v19.0/{post_id}/comments'
+    params = {
+        'access_token': token,
+        'fields': 'id,message,from,created_time,comment_count,parent',
+        'limit': 100
+    }
+    all_comments = []
+    page = 1
+
+    while url:
+        print(f"[INFO] Requesting page {page} of comments: {url}")
+        try:
+            res = requests.get(url, params=params).json()
+        except Exception as ex:
+            print(f"[ERROR] Exception during API call: {ex}")
+            break
+
+        if 'error' in res:
+            print(f"[ERROR] Facebook API Error: {res['error']}")
+            break
+
+        comments = res.get('data', [])
+        print(f"[INFO] Fetched {len(comments)} comments on this page.")
+        for c in comments:
+            comment_id = c.get('id')
+            user = c.get('from', {})
+            message = c.get('message', '')
+            reactions = get_reaction_counts(comment_id, token)
+            user_id = user.get('id')
+            if user_id:
+                user_info = get_user_info(user_id, token)
+            else:
+                user_info = {'user_profile_link': '', 'user_gender': '', 'is_verified': ''}
+            try:
+                lang = detect(message) if message else ''
+            except LangDetectException:
+                lang = ''
+            parent_comment_id = c.get('parent', {}).get('id', '')
+            all_comments.append({
+                'comment_id': comment_id,
+                'user_id': user_id,
+                'user_name': user.get('name', ''),
+                'comment_text': message,
+                'created_time': c.get('created_time', ''),
+                'like_count': reactions['like_count'],
+                'love_count': reactions['love_count'],
+                'haha_count': reactions['haha_count'],
+                'wow_count': reactions['wow_count'],
+                'sad_count': reactions['sad_count'],
+                'angry_count': reactions['angry_count'],
+                'care_count': reactions['care_count'],
+                'reply_count': c.get('comment_count', 0),
+                'user_profile_link': user_info['user_profile_link'],
+                'user_gender': user_info['user_gender'],
+                'is_verified': user_info['is_verified'],
+                'language': lang,
+                'parent_comment_id': parent_comment_id
+            })
+
+        url = res.get('paging', {}).get('next')
+        params = {}  # Clear params for next page
+        page += 1
+
+    if all_comments:
+        print(f"[SUCCESS] Total comments fetched: {len(all_comments)}")
+        df = pd.DataFrame(all_comments, columns=[
+            'comment_id','user_id','user_name','comment_text','created_time','like_count',
+            'love_count','haha_count','wow_count','sad_count','angry_count','care_count',
+            'reply_count','user_profile_link','user_gender','is_verified','language','parent_comment_id'
+        ])
         return df
     else:
-        # Return empty DataFrame for all other tokens/IDs (or put real fetching code here)
+        print("[WARN] No comments found or error in fetching. Check permissions/token/post privacy.")
         return pd.DataFrame()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+
+def fetch_comments(token, post_url):
+    if token == "test" and post_url == "test":
+        df = load_test_comments()
+        return df
+    else:
+        df = fetch_comments_from_facebook(token, post_url)
+        return df

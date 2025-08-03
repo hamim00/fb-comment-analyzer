@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="center-box">
+    <div class="main-title" style="margin-bottom:1.2em;">Choose Account</div>
+    <div class="card">
+        <form method="post" autocomplete="off">
+            <div class="account-options">
+                <div class="radio-row">
+                    <input type="radio" id="profile" name="account_type" value="user" checked>
+                    <label for="profile" class="account-label">
+                        Use my profile
+                        <span class="username">({{ user['name'] }})</span>
+                    </label>
+                </div>
+                {% if pages %}
+                <div class="radio-row">
+                    <input type="radio" id="page" name="account_type" value="page">
+                    <label for="page" class="account-label">
+                        Use my page:
+                    </label>
+                    <select name="page_id" id="page_id">
+                        {% for page in pages %}
+                        <option value="{{ page['id'] }}">{{ page['name'] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            <button type="submit" class="button button-primary">Continue</button>
+
+        </form>
+    </div>
+</div>
+{% endblock %}

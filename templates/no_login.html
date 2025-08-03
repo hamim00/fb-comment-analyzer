@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="center-box">
+    <div class="main-title">Facebook Comment Analyzer</div>
+    <div class="subtitle" style="margin-bottom: 1.2em;">
+        Analyze Facebook post comments with a single click.
+    </div>
+    <div style="font-size:1.17em; color: #d3e2fd; font-weight: 600; margin-bottom: 2.5em;">
+        <span style="color: #fff;">Log in to continue.</span>
+    </div>
+    <a href="{{ url_for('login') }}" class="button button-primary">Login with Facebook</a>
+</div>
+{% endblock %}
