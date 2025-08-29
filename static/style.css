@@ -1,9 +1,25 @@
 body {
-    background: #181b22;
-    color: #e4e8ef;
+    background-color: #f0f4f8;
     font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    color: #333333;
     margin: 0;
     padding: 0;
+    overflow-x: hidden;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #4a90e2, #50e3c2);
+    animation: gradientShift 8s ease infinite;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.container-fluid, .row {
+    height: 100%;
 }
 
 .center-box {
@@ -15,43 +31,41 @@ body {
 }
 
 .main-title {
-    font-size: 3em;
-    font-weight: 800;
+    font-size: 2.5em;
+    font-weight: 700;
     margin-bottom: 0.6em;
-    letter-spacing: -1.3px;
-    color: #fff;
+    color: #2c3e50;
 }
 
 .subtitle {
-    font-size: 1.45em;
+    font-size: 1.25em;
     margin-bottom: 0.4em;
-    color: #a2b4c9;
-    font-weight: 600;
+    color: #7f8c8d;
+    font-weight: 500;
 }
 
 .account-switch-info {
     font-size: 1em;
-    color: #adb5bd;
+    color: #95a5a6;
     margin-bottom: 2em;
 }
 
 .link-btn {
-    color: #37a6ff;
-    text-decoration: underline;
+    color: #3498db;
+    text-decoration: none;
     font-weight: 500;
 }
 
 .link-btn:hover {
-    color: #54c7ec;
+    color: #2980b9;
     text-decoration: underline;
 }
 
 .section-label {
     font-size: 1.18em;
-    font-weight: 700;
+    font-weight: 600;
     margin: 1.4em 0 0.5em 0;
-    color: #ffffff;
-    letter-spacing: 0.3px;
+    color: #2c3e50;
 }
 
 textarea {
@@ -60,66 +74,54 @@ textarea {
     border-radius: 9px;
     padding: 0.7em;
     font-size: 1.08em;
-    background: #232736;
-    color: #b4e2ff;
-    border: 1.5px solid #27334e;
+    background: #ffffff;
+    color: #333333;
+    border: 1px solid #dfe6e9;
     resize: vertical;
     margin-bottom: 1.8em;
 }
 
 /* BUTTON STYLES */
-.button {
+.btn-primary {
     font-family: inherit;
-    font-size: 1.5em;
+    font-size: 1.2em;
     font-weight: 500;
     border: none;
-    border-radius: 12px;
-    padding: 18px 46px;
-    margin-top: 32px;
-    margin-bottom: 24px;
-    box-shadow: 0 3px 16px rgba(80,140,255,0.10);
-    letter-spacing: 0.01em;
-    outline: none;
-    display: inline-block;
-    text-align: center;
-    cursor: pointer;
-    transition: background 0.2s, box-shadow 0.2s, color 0.2s;
-    text-decoration: none;
+    border-radius: 8px;
+    padding: 12px 30px;
+    margin-top: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
 }
 
-.button-primary {
-    background: #3498fd;
-    color: #fff;
-}
-
-.button-primary:hover,
-.button-primary:focus {
-    background: #2276d7;
-    box-shadow: 0 4px 24px rgba(80,140,255,0.13);
-    color: #fff;
+.btn-primary:hover,
+.btn-primary:focus {
+    background: linear-gradient(90deg, #2980b9, #1abc9c);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
 }
 
 .button-logout {
-    background: #c13a3a;
-    color: #fff;
-    margin-top: 38px;
+    background: #e74c3c;
+    color: #ffffff;
+    margin-top: 20px;
 }
 
 .button-logout:hover,
 .button-logout:focus {
-    background: #991e1e;
-    color: #fff;
-    box-shadow: 0 4px 24px rgba(255,100,100,0.14);
+    background: #c0392b;
+    color: #ffffff;
+    box-shadow: 0 3px 15px rgba(231, 76, 60, 0.2);
 }
 
-/* Card and form section (for choose account page, etc.) */
+/* Card and form section */
 .card {
-    background: #181c26;
-    border-radius: 2em;
-    box-shadow: 0 5px 32px rgba(44,56,100,0.16);
-    max-width: 950px;
+    background: #ffffff;
+    border-radius: 1.5em;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    max-width: 900px;
     margin: 2em auto 0 auto;
-    padding: 2.7em 3em 3em 3em;
+    padding: 2em;
     text-align: center;
 }
 
@@ -127,141 +129,191 @@ textarea {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 1.3em;
-    margin-bottom: 2em;
-    margin-top: 1.5em;
+    gap: 1em;
+    margin-bottom: 1.5em;
+    margin-top: 1em;
 }
 
 .radio-row {
     display: flex;
     align-items: center;
-    gap: 0.7em;
-    font-size: 1.5em;
+    gap: 0.5em;
+    font-size: 1.2em;
 }
 
 .account-label {
-    font-size: 1.25em;
-    font-weight: 600;
-    color: #fff;
+    font-size: 1.1em;
+    font-weight: 500;
+    color: #2c3e50;
 }
 
 .account-label .username {
-    color: #5db8ff;
+    color: #3498db;
     font-weight: 400;
     margin-left: 4px;
 }
 
 select {
-    font-size: 1.15em;
-    border-radius: 8px;
-    padding: 0.15em 0.7em;
-    border: 1px solid #313545;
-    background: #222533;
-    color: #f3f8ff;
-    margin-left: 0.6em;
+    font-size: 1.1em;
+    border-radius: 6px;
+    padding: 0.2em 0.5em;
+    border: 1px solid #dfe6e9;
+    background: #ffffff;
+    color: #333333;
+    margin-left: 0.5em;
 }
 
-@media (max-width: 600px) {
-    .main-title { font-size: 2em; }
-    .center-box { max-width: 98vw; margin: 2.4em 0 0 0; }
+@media (max-width: 767px) {
+    .row {
+        flex-direction: column;
+        height: auto;
+    }
+    .col-md-6 {
+        width: 100%;
+        padding: 2em;
+    }
+    .main-title { font-size: 1.8em; }
+    .center-box { margin: 2em 0 0 0; }
     textarea { font-size: 1em; }
 }
 
-
-
-
-
-/* --- FB Card UI/UX: Polished for posts.html --- */
-
+/* Post Card */
 .post-card {
-  background: #232736;
-  border-radius: 18px;
-  margin-bottom: 1.8em;
-  padding: 1.2em 1.5em 1em 1.5em;
-  box-shadow: 0 2px 12px rgba(24,119,242,0.08);
-  border: 2px solid transparent;
-  position: relative;
-  transition: box-shadow 0.22s, border 0.22s, transform 0.18s;
+    background: #ffffff;
+    border-radius: 15px;
+    margin-bottom: 1.5em;
+    padding: 1em;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    border: 1px solid #ecf0f1;
+    transition: box-shadow 0.2s, transform 0.2s;
 }
+
 .post-card:hover {
-  box-shadow: 0 4px 32px rgba(66,180,230,0.15);
-  border: 2px solid #42b4e6;
-  transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    transform: translateY(-3px);
 }
 
 .card-media {
-  width: 100%;
-  max-width: 390px;
-  border-radius: 12px;
-  box-shadow: 0 1px 12px rgba(24,119,242,0.09);
-  margin: 0.8em 0 0.6em 0;
-  object-fit: cover;
+    width: 100%;
+    max-width: 390px;
+    border-radius: 8px;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.05);
+    margin: 0.6em 0 0.4em 0;
+    object-fit: cover;
 }
 
-/* Analyze button upgrade: animate on hover, blue palette */
+/* Analyze Button */
 .analyze-btn {
-  background: #1877f2;
-  color: #fff;
-  border: none;
-  padding: 18px 44px;
-  border-radius: 12px;
-  font-size: 1.4em;
-  font-weight: 600;
-  margin-top: 0.8em;
-  margin-bottom: 0.4em;
-  transition: background 0.16s, box-shadow 0.19s, transform 0.19s;
-  cursor: pointer;
-  box-shadow: 0 3px 18px rgba(24,119,242,0.13);
-  outline: none;
-  text-align: center;
-  text-decoration: none;
-  letter-spacing: 0.01em;
-  position: relative;
-  border: 2px solid #1877f2;
-}
-.analyze-btn:hover, .analyze-btn:focus {
-  background: #166fe5;
-  color: #fff;
-  box-shadow: 0 6px 36px rgba(66,180,230,0.19);
-  transform: scale(1.04) translateY(-2px);
-  border: 2px solid #42b4e6;
+    background: #3498db;
+    color: #ffffff;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 8px;
+    font-size: 1.2em;
+    font-weight: 500;
+    margin-top: 0.6em;
+    margin-bottom: 0.3em;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* FontAwesome Icon style and tooltip effect */
-.icon {
-  font-size: 1.19em;
-  vertical-align: middle;
-  color: #42b4e6;
-  cursor: pointer;
-  margin-right: 6px;
+.analyze-btn:hover,
+.analyze-btn:focus {
+    background: #2980b9;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
 }
+
+/* Icon and Tooltip */
+.icon {
+    font-size: 1.1em;
+    vertical-align: middle;
+    color: #3498db;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
 .icon[title]:hover {
-  color: #1877f2;
+    color: #2980b9;
 }
 
 .tooltip {
-  display: inline-block;
-  position: relative;
+    display: inline-block;
+    position: relative;
 }
+
 .tooltip .tooltip-text {
-  visibility: hidden;
-  width: 150px;
-  background: #232736;
-  color: #fff;
-  text-align: center;
-  border-radius: 8px;
-  padding: 6px 11px;
-  position: absolute;
-  z-index: 99;
-  left: 50%;
-  bottom: 128%;
-  transform: translateX(-50%);
-  opacity: 0;
-  transition: opacity 0.22s;
-  font-size: 0.97em;
-  pointer-events: none;
+    visibility: hidden;
+    width: 120px;
+    background: #ecf0f1;
+    color: #333333;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 8px;
+    position: absolute;
+    z-index: 99;
+    left: 50%;
+    bottom: 125%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 0.9em;
 }
+
 .tooltip:hover .tooltip-text {
-  visibility: visible;
-  opacity: 1;
+    visibility: visible;
+    opacity: 1;
+}
+
+/* ====== POST PAGE SPECIFIC STYLES ====== */
+.post-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Space between elements */
+    align-items: center;
+    min-height: 500px; /* Force same height for all cards */
+    text-align: center;
+}
+
+.post-card .mb-3 {
+    width: 100%;
+}
+
+/* Style for "View on Facebook" link */
+.btn-fb-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #1877f2; /* Facebook blue */
+    color: #fff !important;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.btn-fb-link:hover {
+    background: #145dbf;
+    transform: translateY(-2px);
+}
+/* ===== Continue Button Style ===== */
+.btn-continue {
+    display: inline-block;
+    padding: 10px 24px;
+    background: linear-gradient(90deg, #4a90e2, #50e3c2);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+    box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+}
+
+.btn-continue:hover {
+    background: linear-gradient(90deg, #3b78c2, #3fc0a0);
+    transform: translateY(-2px);
 }

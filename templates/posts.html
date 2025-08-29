@@ -1,57 +1,60 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="center-box">
-    <h2 class="main-title" style="margin-bottom:0.4em;">Select a Facebook Post</h2>
-    <p class="subtitle" style="margin-bottom:2em;">Pick one of your latest posts to analyze comments:</p>
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="h3 text-dark mb-3">Select a Facebook Post</h1>
+        <p class="text-muted mb-4">Pick one of your latest posts to analyze comments:</p>
+    </div>
     {% if posts %}
-        <div style="max-width:650px; margin:0 auto;">
-            <ul style="list-style:none; padding:0;">
-                {% for post in posts %}
-                    <li class="post-card">
+        <div class="row justify-content-center">
+            {% for post in posts %}
+                <div class="col-12 col-md-8 mb-4">
+                    <div class="post-card p-4">
+                        <!-- Facebook Button -->
+                        <div class="mb-3 text-center">
+                            <a href="{{ post.permalink_url }}" target="_blank" class="btn-fb-link">
+                                <i class="fa fa-facebook-square" aria-hidden="true"></i>
+                                View on Facebook
+                            </a>
+                        </div>
+
+                        <!-- Post Message (truncate if too long) -->
+                        <div class="mb-3">
+                            {% if post.message %}
+                                {{ post.message[:110] }}{% if post.message|length > 110 %}...{% endif %}
+                            {% else %}
+                                <span class="text-muted">No description/text</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Meta Info -->
+                        <small class="text-muted d-block mb-3">
+                            Posted: {{ post.created_time[:10] }} | ID: {{ post.id }}
+                        </small>
+
                         <!-- Card Media: Image or Video -->
                         {% if post.picture_url %}
-                            <img src="{{ post.picture_url }}" alt="Post Image" class="card-media" loading="lazy">
+                            <img src="{{ post.picture_url }}" alt="Post Image" class="card-media mb-3" loading="lazy">
                         {% elif post.video_url %}
-                            <video class="card-media" controls>
+                            <video class="card-media mb-3" controls>
                                 <source src="{{ post.video_url }}" type="video/mp4">
                                 Your browser does not support the video tag.
                             </video>
                         {% endif %}
-                        <!-- Facebook Icon Link with Tooltip -->
-                        <div style="margin-bottom: 0.5em;">
-                            <span class="tooltip">
-                                <i class="icon fa fa-facebook-square" aria-hidden="true"></i>
-                                <span class="tooltip-text">Open on Facebook</span>
-                            </span>
-                            <a href="{{ post.permalink_url }}" target="_blank" style="color:#47afff; text-decoration:underline; margin-left:0.4em;">
-                                View on Facebook
-                            </a>
-                        </div>
-                        <!-- Post Message (truncate if too long) -->
-                        <div style="font-size:1.05em; margin:0.8em 0 0.6em 0; color:#b1e2fe; min-height:2em;">
-                            {% if post.message %}
-                                {{ post.message[:110] }}{% if post.message|length > 110 %}...{% endif %}
-                            {% else %}
-                                <span style="opacity:.6;">No description/text</span>
-                            {% endif %}
-                        </div>
-                        <!-- Meta Info -->
-                        <div style="font-size:0.96em; color:#8fa6c4; margin-bottom: 1em;">
-                            Posted: {{ post.created_time[:10] }} | ID: {{ post.id }}
-                        </div>
-                        <!-- Animated Analyze Button -->
+
+                        <!-- Analyze Button -->
                         <a href="http://localhost:8501/?fb_token={{ access_token | urlencode }}&post_url={{ post.permalink_url | urlencode }}"
                            target="_blank"
-                           class="button button-primary analyze-btn"
-                           style="margin-top:0.2em;">
+                           class="btn btn-primary d-block text-center w-100 py-3"
+                           style="background: linear-gradient(90deg, #4a90e2, #50e3c2); border: none; box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);">
                            Analyze This Post
                         </a>
-                    </li>
-                {% endfor %}
-            </ul>
+                    </div>
+                </div>
+            {% endfor %}
         </div>
     {% else %}
-        <div class="subtitle">No posts found for this account.</div>
+        <p class="text-muted text-center">No posts found for this account.</p>
     {% endif %}
 </div>
 {% endblock %}
