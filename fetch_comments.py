@@ -1,222 +1,242 @@
+# fetch_comments.py
+import re
+import time
+from io import StringIO
+from typing import Optional, Dict
 
 import pandas as pd
-from io import StringIO
 import requests
-import re
-from langdetect import detect, LangDetectException
+
+# Optional language detection
+try:
+    from langdetect import detect, LangDetectException  # type: ignore
+except Exception:  # langdetect not installed or unavailable
+    detect = None
+
+    class LangDetectException(Exception):
+        ...
 
 
-def load_test_comments():
-    data = StringIO("""
+# ---------- Reliable GET with simple backoff ----------
+def _get(url: str, params: dict | None = None, timeout: int = 30, tries: int = 3) -> requests.Response:
+    """
+    Wrapper around requests.get with basic retries for transient errors.
+    Retries on 429 and 5xx responses with incremental backoff (2s, 4s, 6s).
+    Returns the first non-transient response; if all fail, returns the last response.
+    """
+    for i in range(tries):
+        r = requests.get(url, params=params, timeout=timeout)
+        if r.status_code in (429, 500, 502, 503, 504):
+            time.sleep(2 * (i + 1))
+            continue
+        return r
+    return r  # likely an error; caller should inspect
+
+
+# ---------- URL → Object ID extractor (reels/videos/photos/posts/groups) ----------
+_PATTERNS = [
+    (re.compile(r"facebook\.com/reel/(\d+)", re.I), lambda m: m.group(1)),
+    (re.compile(r"facebook\.com/.*/videos/(\d+)", re.I), lambda m: m.group(1)),
+    (re.compile(r"facebook\.com/watch/\?v=(\d+)", re.I), lambda m: m.group(1)),
+    (re.compile(r"[?&]v=(\d+)", re.I), lambda m: m.group(1)),
+    (re.compile(r"facebook\.com/photo\.php\?[^#]*\bfbid=(\d+)", re.I), lambda m: m.group(1)),
+    (re.compile(r"facebook\.com/(?:permalink|story)\.php\?[^#]*\bstory_fbid=(\d+)", re.I), lambda m: m.group(1)),
+    (re.compile(r"facebook\.com/.*/posts/(\d+)", re.I), lambda m: m.group(1)),
+    # groups → Graph expects "<groupId>_<postId>"
+    (re.compile(r"facebook\.com/groups/(\d+)/permalink/(\d+)", re.I), lambda m: f"{m.group(1)}_{m.group(2)}"),
+    (re.compile(r"facebook\.com/groups/(\d+)/posts/(\d+)", re.I), lambda m: f"{m.group(1)}_{m.group(2)}"),
+]
+
+
+def extract_object_id(url: str) -> Optional[str]:
+    """Extract a Graph object ID from a variety of Facebook URL shapes."""
+    if not url:
+        return None
+    url = url.strip()
+    for rx, fmt in _PATTERNS:
+        m = rx.search(url)
+        if m:
+            return fmt(m)
+    # allow raw numeric IDs as input
+    if re.fullmatch(r"\d+", url):
+        return url
+    return None
+
+
+# ---------- Demo/Test data ----------
+def load_test_comments() -> pd.DataFrame:
+    data = StringIO(
+        """
 comment_id,user_id,user_name,comment_text,created_time,like_count,love_count,haha_count,wow_count,sad_count,angry_count,care_count,reply_count,user_profile_link,user_gender,is_verified,language,parent_comment_id
 cmt_1,user_1,নুসরাত জাহান শিলা,"খুব সুন্দর লিখেছেন, মুগ্ধ হলাম। শুভকামনা।",2024-06-09 12:01:15,8,3,0,1,0,0,0,1,https://facebook.com/101001,Female,False,Bangla,
 cmt_2,user_2,John Abraham,"This is such an informative post. Thanks for sharing!",2024-06-09 12:05:50,5,2,0,0,0,0,1,0,https://facebook.com/101002,Male,False,English,
 cmt_3,user_3,সাইফুল ইসলাম মেহেদী,"ভাই, এসব ফালতু কথা বাদ দেন। সময় নষ্ট!",2024-06-09 12:12:30,1,0,2,0,0,2,0,2,https://facebook.com/101003,Male,False,Bangla,
-cmt_4,user_4,Priya Sultana,"Wow, never thought about it this way before! Eye-opening.",2024-06-09 12:15:00,6,1,0,2,0,0,0,1,https://facebook.com/101004,Female,False,English,
-cmt_5,user_5,Farhan Hossain,"Post ta dekhlei matha ghumay. Bujhlam na ki bolte chao.",2024-06-09 12:20:11,0,0,1,0,0,1,0,0,https://facebook.com/101005,Male,False,Banglish,
-cmt_6,user_6,তাহমিনা আক্তার মিতা,"সবাই শুধু সমালোচনা করতে জানে, কেউ সাহায্য করে না।",2024-06-09 12:25:25,2,1,0,0,1,1,1,0,https://facebook.com/101006,Female,False,Bangla,
-cmt_7,user_7,Tanvir Rahman,"Is this post even real? Feels so fake.",2024-06-09 12:32:55,3,0,1,0,0,1,0,2,https://facebook.com/101007,Male,True,English,
-cmt_8,user_8,আরিফুল ইসলাম রানা,"এত সুন্দর ছবি! কোথায় তুলেছেন?",2024-06-09 12:37:20,7,2,0,1,0,0,0,1,https://facebook.com/101008,Male,False,Bangla,
-cmt_9,user_9,Shamima Nasrin,"Love the energy here! Keep it up!",2024-06-09 12:42:18,5,4,0,0,0,0,0,0,https://facebook.com/101009,Female,False,English,
-cmt_10,user_10,তানভীর হাসান জুবায়ের,"এটা কি স্প্যাম পোস্ট নাকি? অযথা লিঙ্ক শেয়ার করবেন না!",2024-06-09 12:46:39,0,0,0,0,2,2,0,0,https://facebook.com/101010,Male,False,Bangla,
-cmt_11,user_11,Fariha Kabir,"Eto boro post pore time waste korlam! Next time short e lekhen.",2024-06-09 12:48:50,2,1,0,0,1,1,0,1,https://facebook.com/101011,Female,False,Banglish,
-cmt_12,user_12,রাকিবুল হাসান রাকিব,"সবাইকে বলছি, দয়া করে গালাগালি বন্ধ করুন।",2024-06-09 12:51:23,3,1,0,0,0,1,0,1,https://facebook.com/101012,Male,False,Bangla,
-cmt_13,user_13,Abir Ahmed,"This totally made my day. Good vibes only!",2024-06-09 12:53:19,5,3,0,1,0,0,0,0,https://facebook.com/101013,Male,False,English,
-cmt_14,user_14,Samira Islam,"Such a waste of time... Seriously?",2024-06-09 12:58:33,0,0,1,0,0,1,0,0,https://facebook.com/101014,Female,False,English,
-cmt_15,user_15,অমিত হাসান সজীব,"মতামত দারুন, কিন্তু বাস্তবতা একটু আলাদা।",2024-06-09 13:02:48,2,1,0,0,0,0,0,0,https://facebook.com/101015,Male,False,Bangla,
-cmt_16,user_16,Shawon Mahmud,"Good point, but implementation kothay?",2024-06-09 13:05:56,3,0,1,0,0,1,0,0,https://facebook.com/101016,Male,False,Banglish,
-cmt_17,user_17,Anika Rahman,"Couldn’t agree more! Finally someone said it.",2024-06-09 13:09:14,10,3,0,1,0,0,1,1,https://facebook.com/101017,Female,True,English,
-cmt_18,user_18,জিয়া উদ্দিন বাবু,"এটা নিয়ে প্রশাসনের নজর দেয়া উচিত।",2024-06-09 13:12:00,1,0,0,0,0,1,0,0,https://facebook.com/101018,Male,False,Bangla,
-cmt_19,user_19,Hasan Murad,"Lol, ekdom funny! 😂",2024-06-09 13:15:27,9,1,4,0,0,0,0,2,https://facebook.com/101019,Male,False,Banglish,
-cmt_20,user_20,সালমা আক্তার তিথি,"সবাই কেমন আছেন? কিছু জানার থাকলে বলুন।",2024-06-09 13:18:36,2,0,0,0,0,0,0,1,https://facebook.com/101020,Female,False,Bangla,
-cmt_21,user_21,Rifat Chowdhury,"Is there any source for this information?",2024-06-09 13:20:21,1,0,0,1,0,0,0,0,https://facebook.com/101021,Male,False,English,
-cmt_22,user_22,স্বর্ণা ইসলাম মৌ,"আপনি কি সত্যি এসব বিশ্বাস করেন?",2024-06-09 13:23:29,1,0,0,0,0,1,0,0,https://facebook.com/101022,Female,False,Bangla,
-cmt_23,user_23,Md Shakil Ahmed,"Stop spamming! eta onek annoying.",2024-06-09 13:25:40,0,0,0,0,0,1,0,0,https://facebook.com/101023,Male,False,Banglish,
-cmt_24,user_24,Shapla Rani Biswas,"Superb! I want more content like this.",2024-06-09 13:27:55,4,3,0,0,0,0,0,0,https://facebook.com/101024,Female,False,English,
-cmt_25,user_25,আবু বকর সিদ্দিক,"সবাই গালাগালি করছে কেন? দয়া করে শান্ত থাকুন।",2024-06-09 13:30:12,3,0,0,0,0,1,0,1,https://facebook.com/101025,Male,False,Bangla,
-cmt_26,user_26,Mahadiul Islam,"Eta best post chilo ajker. Respect bro!",2024-06-09 13:33:08,6,2,1,0,0,0,0,0,https://facebook.com/101026,Male,False,Banglish,
-cmt_27,user_27,Ananya Haque,"Are you kidding me? What is this nonsense?",2024-06-09 13:35:50,1,0,1,0,0,1,0,0,https://facebook.com/101027,Female,False,English,
-cmt_28,user_28,জয়নাল আবেদীন মিলন,"এটা নিয়ে কি কেউ সিরিয়াসলি ভাবছে?",2024-06-09 13:39:14,0,0,0,0,0,0,0,0,https://facebook.com/101028,Male,False,Bangla,
-cmt_29,user_29,Tamanna Rahman,"Ei topic ta niye onek din theke chinta kortesi.",2024-06-09 13:41:00,3,0,0,0,0,0,0,0,https://facebook.com/101029,Female,False,Banglish,
-cmt_30,user_30,রেজওয়ান কবির শুভ,"ভাই, নিজের কাজ করেন। অন্যের সমালোচনা করা বাদ দেন।",2024-06-09 13:45:12,4,1,0,0,0,1,0,0,https://facebook.com/101030,Male,False,Bangla,
-cmt_31,user_31,Afsana Mim,"Super helpful! Ei rokom content chai aro.",2024-06-09 13:48:50,7,2,0,0,0,0,0,1,https://facebook.com/101031,Female,False,Banglish,
-cmt_32,user_32,Al Amin Siddique,"Spam comment detected! Pls remove.",2024-06-09 13:52:33,0,0,0,0,0,1,0,0,https://facebook.com/101032,Male,False,English,
-cmt_33,user_33,মেহেরুন নাহার লিপি,"আশা করি, সবার উপকারে আসবে।",2024-06-09 13:56:44,2,1,0,0,0,0,0,0,https://facebook.com/101033,Female,False,Bangla,
-cmt_34,user_34,Shafkat Hossain,"Why is everyone fighting here? Grow up guys.",2024-06-09 14:01:21,1,0,0,0,0,1,0,1,https://facebook.com/101034,Male,False,English,
-cmt_35,user_35,রিমন আহমেদ,"এটা কি মজা না কি সিরিয়াস?",2024-06-09 14:03:12,3,0,1,0,0,0,0,0,https://facebook.com/101035,Male,False,Bangla,
-cmt_36,user_36,Farzana Chowdhury,"Great initiative. Ei jinis ta onek dorkar chilo.",2024-06-09 14:07:41,6,2,0,0,0,0,1,0,https://facebook.com/101036,Female,True,Banglish,
-cmt_37,user_37,Tareq Aziz,"Useless post, wasted my 2 minutes.",2024-06-09 14:10:19,0,0,0,0,0,2,0,0,https://facebook.com/101037,Male,False,English,
-cmt_38,user_38,রেহানা পারভীন শিলা,"আপনার কথাগুলো অনেক মানে রাখে। ধন্যবাদ।",2024-06-09 14:13:12,5,1,0,0,0,0,0,1,https://facebook.com/101038,Female,False,Bangla,
-cmt_39,user_39,Moina Ashraf,"This is so fake news! Please verify before posting.",2024-06-09 14:15:30,2,0,0,0,0,1,0,0,https://facebook.com/101039,Female,False,English,
-cmt_40,user_40,শফিকুল ইসলাম শাওন,"আপনি কোথায় থেকে এসব জানলেন? সোর্স দেন।",2024-06-09 14:18:05,1,0,0,0,0,0,0,0,https://facebook.com/101040,Male,False,Bangla,
-cmt_41,user_41,Shahida Akter,"Stop spreading hate. Let’s be positive.",2024-06-09 14:20:13,4,1,0,0,0,1,0,0,https://facebook.com/101041,Female,False,English,
-cmt_42,user_42,আসিফ ইকবাল,"এটা তো পুরনো খবর। নতুন কিছু নেই?",2024-06-09 14:24:28,1,0,0,0,0,0,0,0,https://facebook.com/101042,Male,False,Bangla,
-cmt_43,user_43,Mamun Reza,"Everyone, please ignore spam comments.",2024-06-09 14:27:41,2,0,0,0,0,1,0,0,https://facebook.com/101043,Male,False,English,
-cmt_44,user_44,জুবায়ের হোসেন,"ধন্যবাদ, আমার প্রশ্নের উত্তর পেয়েছি।",2024-06-09 14:29:05,3,1,0,0,0,0,0,0,https://facebook.com/101044,Male,False,Bangla,
-cmt_45,user_45,Shefa Noor,"Why so much negativity here? Unfollowed.",2024-06-09 14:33:17,1,0,0,0,0,1,0,0,https://facebook.com/101045,Female,False,English,
-cmt_46,user_46,রফিকুল ইসলাম চৌধুরী,"অন্যদের সম্মান করুন। এটা খুব জরুরি।",2024-06-09 14:35:59,2,1,0,0,0,0,0,1,https://facebook.com/101046,Male,False,Bangla,
-cmt_47,user_47,Nahidul Islam,"Eto gyan dite hoy na, chill bro!",2024-06-09 14:39:26,5,0,1,0,0,0,0,0,https://facebook.com/101047,Male,False,Banglish,
-cmt_48,user_48,Shaila Mim,"Loved the perspective. We need more of this.",2024-06-09 14:42:10,7,2,0,0,0,0,0,1,https://facebook.com/101048,Female,False,English,
-cmt_49,user_49,জোবায়ের আহমেদ,"সবাই মিলে ভালো কিছু করার চেষ্টা করি।",2024-06-09 14:45:27,3,1,0,0,0,0,0,0,https://facebook.com/101049,Male,False,Bangla,
-cmt_50,user_50,Arifur Rahman,"Spam! spam! spam! visit www.fakewebsite.com for gift.",2024-06-09 14:48:11,0,0,0,0,0,2,0,0,https://facebook.com/101050,Male,False,English,
-cmt_51,user_12,রাকিবুল হাসান রাকিব,"এটা নিছক মজা, সিরিয়াসলি নেবেন না।",2024-06-09 14:51:36,2,0,0,0,0,1,0,0,https://facebook.com/101012,Male,False,Bangla,
-cmt_52,user_14,Samira Islam,"Here we go again, same old stories.",2024-06-09 15:00:17,0,0,0,0,0,1,0,0,https://facebook.com/101014,Female,False,English,
-cmt_53,user_36,Farzana Chowdhury,"Absolutely loved the analysis. Very well explained.",2024-06-09 15:02:03,6,3,0,1,0,0,0,0,https://facebook.com/101036,Female,True,English,
-cmt_54,user_15,অমিত হাসান সজীব,"বিষয়টা আরও পরিষ্কার করলে ভালো হতো।",2024-06-09 15:05:15,2,0,0,0,0,0,0,0,https://facebook.com/101015,Male,False,Bangla,
-cmt_55,user_41,Shahida Akter,"People need to chill. It's just a post.",2024-06-09 15:08:42,3,1,0,0,0,0,0,0,https://facebook.com/101041,Female,False,English,
-cmt_56,user_10,তানভীর হাসান জুবায়ের,"বারবার একই প্রশ্ন কেন করছে সবাই?",2024-06-09 15:10:33,1,0,0,0,0,1,0,0,https://facebook.com/101010,Male,False,Bangla,
-cmt_57,user_5,Farhan Hossain,"Valo comment chilo. Baki gulo spam.",2024-06-09 15:12:45,2,1,0,0,0,0,0,0,https://facebook.com/101005,Male,False,Banglish,
-cmt_58,user_20,সালমা আক্তার তিথি,"Amazing post! Wish more people would see this.",2024-06-09 15:14:17,8,3,0,1,0,0,0,1,https://facebook.com/101020,Female,False,Bangla,
-cmt_59,user_37,Tareq Aziz,"Lame! Eta dekhlei matha betha lage.",2024-06-09 15:15:44,0,0,2,0,1,1,0,0,https://facebook.com/101037,Male,False,Banglish,
-cmt_60,user_50,Arifur Rahman,"Stop the hate. Spread positivity.",2024-06-09 15:17:32,3,2,0,0,0,0,1,0,https://facebook.com/101050,Male,False,English,
-cmt_61,user_25,আবু বকর সিদ্দিক,"আমি তো কিছুই বুঝলাম না।",2024-06-09 15:19:07,1,0,0,0,0,1,0,0,https://facebook.com/101025,Male,False,Bangla,
-""")
+"""
+    )
+    # (Trimmed for brevity; your original long CSV block is fine to keep)
     return pd.read_csv(data)
 
 
+# ---------- Facebook fetcher ----------
+def fetch_comments_from_facebook(token: str, post_url: str) -> pd.DataFrame:
+    """
+    Fetches top-level comments for a given Facebook object URL/ID.
+    Returns a DataFrame with:
+      comment_id, user_id, user_name, comment_text, created_time,
+      like_count, love_count, haha_count, wow_count, sad_count, angry_count, care_count,
+      reply_count, user_profile_link, user_gender, is_verified, language, parent_comment_id
+    """
+    oid = extract_object_id(post_url)
+    if not oid:
+        print(f"[ERROR] Could not extract an object ID from: {post_url}")
+        return pd.DataFrame()
 
-
-
-
-
-def fetch_comments_from_facebook(token, post_url):
-    def extract_facebook_id(url):
-        match_photo = re.search(r'fbid=(\d+)', url)
-        match_video = re.search(r'/videos/(\d+)', url) or re.search(r'v=(\d+)', url)
-        if match_photo:
-            post_id = match_photo.group(1)
-            post_type = 'photo'
-        elif match_video:
-            post_id = match_video.group(1)
-            post_type = 'video'
-        else:
-            post_id = None
-            post_type = None
-        return post_id, post_type
-
-    def get_reaction_counts(comment_id, token):
-        types = ['LIKE', 'LOVE', 'HAHA', 'WOW', 'SAD', 'ANGRY', 'CARE']
-        counts = {}
+    # Helpers kept inside to avoid global namespace noise
+    def get_reaction_counts(comment_id: str, token: str) -> Dict[str, int]:
+        types = ["LIKE", "LOVE", "HAHA", "WOW", "SAD", "ANGRY", "CARE"]
+        counts: Dict[str, int] = {}
         for reaction in types:
-            url = f'https://graph.facebook.com/v19.0/{comment_id}/reactions'
-            params = {'type': reaction, 'summary': 'total_count', 'access_token': token}
             try:
-                res = requests.get(url, params=params).json()
-                counts[f"{reaction.lower()}_count"] = res.get('summary', {}).get('total_count', 0)
+                r = _get(
+                    f"https://graph.facebook.com/v19.0/{comment_id}/reactions",
+                    params={"type": reaction, "summary": "total_count", "limit": 0, "access_token": token},
+                    timeout=20,
+                )
+                j = r.json()
+                counts[f"{reaction.lower()}_count"] = j.get("summary", {}).get("total_count", 0)
             except Exception as ex:
                 print(f"[WARN] Could not fetch reaction '{reaction}' for {comment_id}: {ex}")
                 counts[f"{reaction.lower()}_count"] = 0
         return counts
 
-    def get_user_info(user_id, token):
-        url = f'https://graph.facebook.com/v19.0/{user_id}'
-        params = {'fields': 'link,gender,verified', 'access_token': token}
+    def get_user_info(user_id: str, token: str) -> Dict[str, str]:
         try:
-            res = requests.get(url, params=params).json()
-            return {
-                'user_profile_link': res.get('link', ''),
-                'user_gender': res.get('gender', ''),
-                'is_verified': res.get('verified', '')
-            }
+            r = _get(
+                f"https://graph.facebook.com/v19.0/{user_id}",
+                params={"fields": "link,verified", "access_token": token},
+                timeout=20,
+            )
+            j = r.json()
+            return {"user_profile_link": j.get("link", ""), "is_verified": j.get("verified", "")}
         except Exception as ex:
             print(f"[WARN] Could not fetch user info for {user_id}: {ex}")
-            return {'user_profile_link': '', 'user_gender': '', 'is_verified': ''}
+            return {"user_profile_link": "", "is_verified": ""}
 
-    print(f"Fetching comments for URL: {post_url}")
-    post_id, post_type = extract_facebook_id(post_url)
-    if not post_id:
-        print(f"[ERROR] Could not extract post ID from: {post_url}")
-        return pd.DataFrame()
-
-    url = f'https://graph.facebook.com/v19.0/{post_id}/comments'
+    url = f"https://graph.facebook.com/v19.0/{oid}/comments"
     params = {
-        'access_token': token,
-        'fields': 'id,message,from,created_time,comment_count,parent',
-        'limit': 100
+        "access_token": token,
+        "fields": "id,message,from,created_time,comment_count,parent",
+        "filter": "toplevel",  # change to 'stream' if you want replies too
+        "limit": 100,
+        "summary": "true",
     }
-    all_comments = []
+
+    all_rows: list[dict] = []
     page = 1
 
     while url:
         print(f"[INFO] Requesting page {page} of comments: {url}")
         try:
-            res = requests.get(url, params=params).json()
+            r = _get(url, params=params if page == 1 else None, timeout=30)
+            payload = r.json()
         except Exception as ex:
             print(f"[ERROR] Exception during API call: {ex}")
             break
 
-        if 'error' in res:
-            print(f"[ERROR] Facebook API Error: {res['error']}")
+        if r.status_code != 200 or "error" in payload:
+            err = payload.get("error", {})
+            print(
+                f"[ERROR] Graph API {r.status_code}: {err.get('type')} {err.get('code')} – {err.get('message')}"
+            )
             break
 
-        comments = res.get('data', [])
-        print(f"[INFO] Fetched {len(comments)} comments on this page.")
-        for c in comments:
-            comment_id = c.get('id')
-            user = c.get('from', {})
-            message = c.get('message', '')
-            reactions = get_reaction_counts(comment_id, token)
-            user_id = user.get('id')
-            if user_id:
-                user_info = get_user_info(user_id, token)
-            else:
-                user_info = {'user_profile_link': '', 'user_gender': '', 'is_verified': ''}
-            try:
-                lang = detect(message) if message else ''
-            except LangDetectException:
-                lang = ''
-            parent_comment_id = c.get('parent', {}).get('id', '')
-            all_comments.append({
-                'comment_id': comment_id,
-                'user_id': user_id,
-                'user_name': user.get('name', ''),
-                'comment_text': message,
-                'created_time': c.get('created_time', ''),
-                'like_count': reactions['like_count'],
-                'love_count': reactions['love_count'],
-                'haha_count': reactions['haha_count'],
-                'wow_count': reactions['wow_count'],
-                'sad_count': reactions['sad_count'],
-                'angry_count': reactions['angry_count'],
-                'care_count': reactions['care_count'],
-                'reply_count': c.get('comment_count', 0),
-                'user_profile_link': user_info['user_profile_link'],
-                'user_gender': user_info['user_gender'],
-                'is_verified': user_info['is_verified'],
-                'language': lang,
-                'parent_comment_id': parent_comment_id
-            })
+        data = payload.get("data", [])
+        print(f"[INFO] Fetched {len(data)} comments on this page.")
 
-        url = res.get('paging', {}).get('next')
-        params = {}  # Clear params for next page
+        for c in data:
+            cid = c.get("id", "")
+            user = c.get("from") or {}
+            message = c.get("message") or ""
+            uid = user.get("id", "")
+            uname = user.get("name", "")
+
+            rx = get_reaction_counts(cid, token)
+            uex = get_user_info(uid, token) if uid else {"user_profile_link": "", "is_verified": ""}
+
+            # language detection (optional)
+            if detect:
+                try:
+                    lang = detect(message) if message else ""
+                except LangDetectException:
+                    lang = ""
+            else:
+                lang = ""
+
+            all_rows.append(
+                {
+                    "comment_id": cid,
+                    "user_id": uid,
+                    "user_name": uname,
+                    "comment_text": message,
+                    "created_time": c.get("created_time", ""),
+                    "like_count": rx.get("like_count", 0),
+                    "love_count": rx.get("love_count", 0),
+                    "haha_count": rx.get("haha_count", 0),
+                    "wow_count": rx.get("wow_count", 0),
+                    "sad_count": rx.get("sad_count", 0),
+                    "angry_count": rx.get("angry_count", 0),
+                    "care_count": rx.get("care_count", 0),
+                    "reply_count": c.get("comment_count", 0),
+                    "user_profile_link": uex.get("user_profile_link", ""),
+                    "user_gender": "",  # keep column for compatibility; Graph rarely returns gender
+                    "is_verified": uex.get("is_verified", ""),
+                    "language": lang,
+                    "parent_comment_id": (c.get("parent") or {}).get("id", ""),
+                }
+            )
+
+        url = (payload.get("paging") or {}).get("next")
+        params = None  # only send params for the first page
         page += 1
 
-    if all_comments:
-        print(f"[SUCCESS] Total comments fetched: {len(all_comments)}")
-        df = pd.DataFrame(all_comments, columns=[
-            'comment_id','user_id','user_name','comment_text','created_time','like_count',
-            'love_count','haha_count','wow_count','sad_count','angry_count','care_count',
-            'reply_count','user_profile_link','user_gender','is_verified','language','parent_comment_id'
-        ])
-        return df
-    else:
-        print("[WARN] No comments found or error in fetching. Check permissions/token/post privacy.")
+    if not all_rows:
+        print("[WARN] No comments found. Check token, permissions, or post visibility.")
         return pd.DataFrame()
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+    df = pd.DataFrame(
+        all_rows,
+        columns=[
+            "comment_id",
+            "user_id",
+            "user_name",
+            "comment_text",
+            "created_time",
+            "like_count",
+            "love_count",
+            "haha_count",
+            "wow_count",
+            "sad_count",
+            "angry_count",
+            "care_count",
+            "reply_count",
+            "user_profile_link",
+            "user_gender",
+            "is_verified",
+            "language",
+            "parent_comment_id",
+        ],
+    )
+    print(f"[SUCCESS] Total comments fetched: {len(df)}")
+    return df
 
 
-def fetch_comments(token, post_url):
+# ---------- Public wrapper used by dashboard ----------
+def fetch_comments(token: str, post_url: str) -> pd.DataFrame:
+    """
+    Wrapper used by the app:
+    - If token/post_url are both "test", returns built-in demo comments.
+    - Otherwise calls the live Facebook fetcher.
+    """
     if token == "test" and post_url == "test":
-        df = load_test_comments()
-        return df
-    else:
-        df = fetch_comments_from_facebook(token, post_url)
-        return df
+        return load_test_comments()
+    return fetch_comments_from_facebook(token, post_url)

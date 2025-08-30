@@ -1,19 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <title>{% block title %}Facebook Comment Analyzer{% endblock %}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- ✅ Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- ✅ Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    {% block head %}{% endblock %}
+  <meta charset="UTF-8" />
+  <title>{% block title %}Facebook Comment Analyzer{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Apply saved theme before CSS loads -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- Bootstrap + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
+
+  <!-- Site CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  {% block head %}{% endblock %}
 </head>
-<body style="background-color: #f0f4f8; font-family: 'Inter', 'Segoe UI', Arial, sans-serif; color: #333333; margin: 0; padding: 0;">
+<body>
+
+  <!-- Page wrapper (consistent width & padding for ALL pages) -->
+  <main class="page">
     {% block content %}{% endblock %}
-    <!-- ✅ Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </main>
+
+  <!-- Global theme toggle -->
+  <label class="theme-toggle" title="Toggle light/dark">
+    <input id="themeToggle" type="checkbox" />
+    <span class="track"><i class="sun fa fa-sun"></i><i class="moon fa fa-moon"></i></span>
+  </label>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Shared theme script -->
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var tgl = document.getElementById('themeToggle');
+      if (!tgl) return;
+
+      try { tgl.checked = (localStorage.getItem('theme') || 'light') === 'dark'; } catch (e) {}
+
+      function applyTheme(isDark){
+        var val = isDark ? 'dark' : 'light';
+        root.setAttribute('data-theme', val);
+        try { localStorage.setItem('theme', val); } catch (e) {}
+      }
+
+      tgl.addEventListener('change', function(){ applyTheme(tgl.checked); });
+    })();
+  </script>
+
+  {% block scripts %}{% endblock %}
 </body>
 </html>

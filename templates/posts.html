@@ -1,60 +1,278 @@
 {% extends "base.html" %}
+{% block title %}Select a Post · Facebook Comment Analyzer{% endblock %}
+
 {% block content %}
-<div class="container py-5">
-    <div class="text-center mb-5">
-        <h1 class="h3 text-dark mb-3">Select a Facebook Post</h1>
-        <p class="text-muted mb-4">Pick one of your latest posts to analyze comments:</p>
-    </div>
-    {% if posts %}
-        <div class="row justify-content-center">
-            {% for post in posts %}
-                <div class="col-12 col-md-8 mb-4">
-                    <div class="post-card p-4">
-                        <!-- Facebook Button -->
-                        <div class="mb-3 text-center">
-                            <a href="{{ post.permalink_url }}" target="_blank" class="btn-fb-link">
-                                <i class="fa fa-facebook-square" aria-hidden="true"></i>
-                                View on Facebook
-                            </a>
-                        </div>
+<div class="container-xxl py-3">
 
-                        <!-- Post Message (truncate if too long) -->
-                        <div class="mb-3">
-                            {% if post.message %}
-                                {{ post.message[:110] }}{% if post.message|length > 110 %}...{% endif %}
-                            {% else %}
-                                <span class="text-muted">No description/text</span>
-                            {% endif %}
-                        </div>
+  {# Show backend error only when we actually have nothing to render #}
+  {% if error and (posts|length == 0) %}
+  <div class="alert alert-danger mt-2" role="alert">
+    {{ error }}
+  </div>
+  {% endif %}
 
-                        <!-- Meta Info -->
-                        <small class="text-muted d-block mb-3">
-                            Posted: {{ post.created_time[:10] }} | ID: {{ post.id }}
-                        </small>
+  <!-- Hero -->
+  <div class="hero card border-0 shadow-sm mb-3" style="border-radius:22px;">
+    <div class="position-relative p-4">
+      <h1 class="mb-1" style="font-weight:800;">Select a Facebook Post</h1>
+      <p class="text-muted mb-0">Pick a post to analyze comments, sentiment, and engagement.</p>
 
-                        <!-- Card Media: Image or Video -->
-                        {% if post.picture_url %}
-                            <img src="{{ post.picture_url }}" alt="Post Image" class="card-media mb-3" loading="lazy">
-                        {% elif post.video_url %}
-                            <video class="card-media mb-3" controls>
-                                <source src="{{ post.video_url }}" type="video/mp4">
-                                Your browser does not support the video tag.
-                            </video>
-                        {% endif %}
-
-                        <!-- Analyze Button -->
-                        <a href="http://localhost:8501/?fb_token={{ access_token | urlencode }}&post_url={{ post.permalink_url | urlencode }}"
-                           target="_blank"
-                           class="btn btn-primary d-block text-center w-100 py-3"
-                           style="background: linear-gradient(90deg, #4a90e2, #50e3c2); border: none; box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);">
-                           Analyze This Post
-                        </a>
-                    </div>
-                </div>
-            {% endfor %}
+      {% if account_name %}
+      <div class="position-absolute end-0 top-0 m-3 d-inline-flex align-items-center gap-2 bg-white"
+           style="border:1px solid var(--border); border-radius:999px; padding:.45rem .7rem; box-shadow:0 6px 16px rgba(13,38,76,.08);">
+        <span class="avatar d-inline-grid place-items-center"
+              style="width:36px;height:36px;border-radius:50%;background:var(--grad);color:#fff;font-weight:800;">
+          {{ (account_name|default('U'))[0] }}
+        </span>
+        <div>
+          <div class="text-muted small">Signed in as</div>
+          <div class="fw-semibold">{{ account_name }}</div>
         </div>
-    {% else %}
-        <p class="text-muted text-center">No posts found for this account.</p>
-    {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Command bar -->
+  <div class="command-bar__inner mb-3" style="border:1px solid var(--border); border-radius:16px; padding:12px; background:var(--card); box-shadow:0 10px 24px rgba(13,38,76,.10);">
+    <div class="row g-2 align-items-center">
+      <div class="col-12 col-lg">
+        <div class="input-group control-search">
+          <span class="input-group-text"><i class="fa fa-search"></i></span>
+          <input id="searchInput" class="form-control" placeholder="Search captions… ( / to focus )" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="col-7 col-lg-3">
+        <select id="sortSelect" class="form-select">
+          <option value="latest" selected>Sort: Latest (R)</option>
+          <option value="oldest">Sort: Oldest</option>
+        </select>
+      </div>
+
+      <div class="col-5 col-lg-2 text-end">
+        <label class="btn btn-gradient btn-shimmer w-100" id="toggleCompareWrap">
+          <input type="checkbox" id="toggleCompare" class="form-check-input me-2" style="transform:scale(1.2);" />
+          Compare
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div class="row g-3" id="postsGrid">
+    {% for post in posts %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <!-- Data attributes for compare -->
+      <div class="post-card"
+           data-id="{{ post.id }}"
+           data-title="{{ (post.message or post.name or 'Untitled')|e }}"
+           data-date="{{ (post.created_time|default(''))[:10] }}"
+           data-likes="{{ post.like_count|default(0) }}"
+           data-comments="{{ post.comment_count|default(0) }}"
+           data-shares="{{ post.share_count|default(0) }}"
+           data-url="{{ post.permalink_url }}"
+           data-img="{{ post.picture_url or '' }}">
+
+        <!-- Compare select (hidden unless compare-mode) -->
+        <label class="select-box">
+          <input type="checkbox" class="cmp-check" value="{{ post.id }}">
+          <span class="box"><i class="fa fa-check"></i></span>
+        </label>
+
+        <!-- Media -->
+        <div class="media-wrap">
+          {% if post.picture_url %}
+            <img src="{{ post.picture_url }}" alt="Post media" loading="lazy" fetchpriority="{{ 'high' if loop.index0 < 3 else 'auto' }}">
+          {% elif post.video_url %}
+            <video preload="metadata"><source src="{{ post.video_url }}" type="video/mp4"></video>
+          {% else %}
+            <div class="skeleton" style="height:100%;"></div>
+          {% endif %}
+
+          <!-- Overlay: title + external icon ONLY -->
+          <div class="media-overlay d-flex justify-content-between align-items-end">
+            <div class="overlay-title clamp clamp-2">{{ post.message or ' ' }}</div>
+            <a class="icon-btn" href="{{ post.permalink_url }}" target="_blank" rel="noopener" title="Open on Facebook">
+              <i class="fa fa-external-link-alt"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- Title -->
+        <h5 class="post-title clamp clamp-1 mt-3">
+          {{ post.message or post.name or 'Untitled' }}
+        </h5>
+
+        <!-- Meta -->
+        <div class="post-meta mb-2">
+          Posted {{ (post.created_time|default(''))[:10] }}
+        </div>
+
+        <!-- Stats -->
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+          <span class="chip"><i class="fa fa-thumbs-up me-1"></i>{{ post.like_count|default(0) }}</span>
+          <span class="chip"><i class="fa fa-comment me-1"></i>{{ post.comment_count|default(0) }}</span>
+          <span class="chip"><i class="fa fa-share me-1"></i>{{ post.share_count|default(0) }}</span>
+        </div>
+
+        <!-- Buttons -->
+        <div class="btn-wrap">
+          <a class="btn btn-fb-link btn-shimmer"
+             href="{{ post.permalink_url }}" target="_blank" rel="noopener">View on Facebook</a>
+
+           
+            <a
+              href="http://localhost:8501/?fb_token={{ access_token | urlencode }}&post_url={{ post.permalink_url | urlencode }}"
+              target="_blank" rel="noopener"
+              class="btn btn-sm btn-gradient">
+              Analyze This Post
+            </a>
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+  </div>
 </div>
+
+<!-- Compare ribbon -->
+<div id="selectionRibbon" class="selection-ribbon d-none">
+  <div class="container-xxl">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="text-muted">Selected <span id="selCount">0</span> post(s)</div>
+      <div class="d-flex gap-2">
+        <button id="btnClearSel" class="btn btn-outline-secondary">Clear</button>
+        <button id="btnCompareNow" class="btn btn-gradient">Compare</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Compare modal -->
+<div id="cmpModal" class="cmp-modal" aria-hidden="true">
+  <div class="cmp-backdrop"></div>
+  <div class="cmp-dialog">
+    <button class="cmp-close" aria-label="Close">&times;</button>
+    <h5 class="mb-3">Compare selected posts</h5>
+    <div id="cmpContent"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const body = document.body;
+  const tgl = document.getElementById('toggleCompare');
+  const ribbon = document.getElementById('selectionRibbon');
+  const selCount = document.getElementById('selCount');
+  const compareBtn = document.getElementById('btnCompareNow');
+
+  const modal = document.getElementById('cmpModal');
+  const modalContent = document.getElementById('cmpContent');
+  const modalClose = modal.querySelector('.cmp-close');
+  const modalBackdrop = modal.querySelector('.cmp-backdrop');
+
+  const checks = () => Array.from(document.querySelectorAll('.cmp-check:checked'));
+
+  function updateRibbon(){
+    const n = checks().length;
+    selCount.textContent = n;
+    ribbon.classList.toggle('d-none', n===0);
+  }
+
+  if (tgl){
+    tgl.addEventListener('change', () => {
+      body.classList.toggle('compare-mode', tgl.checked);
+      if (!tgl.checked){
+        document.querySelectorAll('.cmp-check').forEach(c => c.checked = false);
+        updateRibbon();
+      }
+    });
+  }
+
+  document.querySelectorAll('.cmp-check').forEach(c => c.addEventListener('change', updateRibbon));
+  document.getElementById('btnClearSel')?.addEventListener('click', ()=>{
+    document.querySelectorAll('.cmp-check').forEach(c => c.checked=false);
+    updateRibbon();
+  });
+
+  // Build & open compare view
+  compareBtn?.addEventListener('click', () => {
+    const selectedCards = checks().map(ch => ch.closest('.post-card'));
+    if (selectedCards.length < 2){
+      alert('Select at least 2 posts to compare.');
+      return;
+    }
+
+    const items = selectedCards.map(card => ({
+      id: card.dataset.id,
+      title: card.dataset.title || 'Untitled',
+      date: card.dataset.date || '',
+      likes: Number(card.dataset.likes || 0),
+      comments: Number(card.dataset.comments || 0),
+      shares: Number(card.dataset.shares || 0),
+      url: card.dataset.url || '#',
+      img: card.dataset.img || ''
+    }));
+
+    renderCompare(items);
+    openModal();
+  });
+
+  function escapeHtml(s){
+    return String(s)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
+  function renderCompare(items){
+    let html =
+      '<div class="table-responsive">'+
+        '<table class="table align-middle mb-0">'+
+          '<thead><tr>'+
+            '<th>Post</th>'+
+            '<th class="text-center">Likes</th>'+
+            '<th class="text-center">Comments</th>'+
+            '<th class="text-center">Shares</th>'+
+          '</tr></thead><tbody>';
+
+    items.forEach(it=>{
+      html +=
+        '<tr>'+
+          '<td style="min-width:260px">'+
+            '<div class="d-flex align-items-center gap-2">'+
+              (it.img ? `<img src="${it.img}" style="width:72px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">` : '')+
+              '<div>'+
+                `<div class="fw-600 clamp clamp-2" style="max-width:360px">${escapeHtml(it.title)}</div>`+
+                `<div class="text-muted small">${escapeHtml(it.date)} · <a href="${it.url}" target="_blank" rel="noopener">View</a></div>`+
+              '</div>'+
+            '</div>'+
+          '</td>'+
+          `<td class="text-center fw-600">${it.likes}</td>`+
+          `<td class="text-center fw-600">${it.comments}</td>`+
+          `<td class="text-center fw-600">${it.shares}</td>`+
+        '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    modalContent.innerHTML = html;
+  }
+
+  function openModal(){ modal.setAttribute('aria-hidden','false'); }
+  function closeModal(){ modal.setAttribute('aria-hidden','true'); }
+
+  modalClose.addEventListener('click', closeModal);
+  modalBackdrop.addEventListener('click', closeModal);
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeModal(); });
+
+  // keyboard: focus search with '/'
+  const input = document.getElementById('searchInput');
+  document.addEventListener('keydown', (e)=>{ if(e.key === '/'){ e.preventDefault(); input?.focus(); }});
+})();
+</script>
 {% endblock %}

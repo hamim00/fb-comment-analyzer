@@ -11,36 +11,73 @@ FB_REDIRECT_URI = os.getenv("FB_REDIRECT_URI")
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 app = Flask(__name__)
+
+# --- number formatting for UI (e.g., 1.2K, 3.4M) ---
+def _abbr(n):
+    try:
+        n = int(n or 0)
+    except Exception:
+        return "0"
+    for thresh, suf in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
+        if n >= thresh:
+            v = n / thresh
+            s = f"{v:.1f}".rstrip("0").rstrip(".")
+            return f"{s}{suf}"
+    return str(n)
+
+# register as a Jinja filter
+app.jinja_env.filters["abbr"] = _abbr
+
+
+
 app.secret_key = SECRET_KEY
 
 # --------- HELPER FUNCTIONS ---------
 
+
+def aggregate_totals(posts):
+    def s(key):
+        return sum(int(p.get(key) or 0) for p in posts)
+    return {
+        "posts": len(posts),
+        "likes": s("like_count"),
+        "comments": s("comment_count"),
+        "shares": s("share_count"),
+    }
+
+
+
 def fetch_facebook_posts(token, page_id):
     url = f"https://graph.facebook.com/v19.0/{page_id}/posts"
-    params = {
-        "access_token": token,
-        "fields": "id,permalink_url,message,created_time,full_picture,attachments{media_type,media,url,subattachments}",
-        "limit": 10
-    }
+    # reactions.type(LIKE) → like count; comments.summary → total comments; shares.count → shares
+    fields = (
+        "id,permalink_url,message,created_time,full_picture,"
+        "attachments{media_type,media,url,subattachments},"
+        "reactions.type(LIKE).limit(0).summary(total_count),"
+        "comments.limit(0).summary(total_count),"
+        "shares"
+    )
+    params = {"access_token": token, "fields": fields, "limit": 10}
     res = requests.get(url, params=params).json()
-    posts = []
-    for p in res.get('data', []):
-        # Default: Try full_picture for image posts
-        picture_url = p.get('full_picture')
-        video_url = None
 
-        # Check attachments for videos/thumbnails
-        attachments = p.get("attachments", {}).get("data", [])
-        if attachments:
-            for att in attachments:
-                media_type = att.get("media_type")
-                media = att.get("media", {})
-                # For video: Facebook sometimes gives a preview_image
-                if media_type == "video":
-                    video_url = att.get("url")  # this is the Facebook video page
-                    picture_url = media.get("image", {}).get("src") or att.get("media", {}).get("source") or picture_url
-                elif media_type == "photo":
-                    picture_url = media.get("image", {}).get("src") or picture_url
+    posts = []
+    for p in res.get("data", []):
+        # media preview
+        picture_url = p.get("full_picture")
+        video_url = None
+        for att in (p.get("attachments", {}) or {}).get("data", []) or []:
+            mt = att.get("media_type")
+            media = att.get("media", {}) or {}
+            if mt == "video":
+                video_url = att.get("url")
+                picture_url = media.get("image", {}).get("src") or picture_url
+            elif mt == "photo":
+                picture_url = media.get("image", {}).get("src") or picture_url
+
+        # counts
+        like_count     = ((p.get("reactions") or {}).get("summary") or {}).get("total_count", 0)
+        comment_count  = ((p.get("comments")  or {}).get("summary") or {}).get("total_count", 0)
+        share_count    =      (p.get("shares") or {}).get("count", 0)
 
         posts.append({
             "id": p.get("id"),
@@ -49,9 +86,11 @@ def fetch_facebook_posts(token, page_id):
             "created_time": p.get("created_time"),
             "picture_url": picture_url,
             "video_url": video_url,
+            "like_count": like_count,
+            "comment_count": comment_count,
+            "share_count": share_count,
         })
     return posts
-
 
 # --------- ROUTES ---------
 

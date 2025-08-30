@@ -1,38 +1,288 @@
 {% extends "base.html" %}
+{% block title %}Choose Account · Facebook Comment Analyzer{% endblock %}
+
+{% block head %}
+<style>
+/* =========================================
+   CHOOSE ACCOUNT (scoped to .ca-*)
+   ======================================= */
+.ca-wrap{max-width:1180px;margin:22px auto 40px;padding:0 16px}
+
+/* HERO */
+.ca-hero{
+  position:relative;border:1px solid var(--border);border-radius:22px;
+  padding:26px 26px 18px;background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,255,255,.86));
+  box-shadow:var(--shadow)
+}
+:root[data-theme="dark"] .ca-hero{background:linear-gradient(180deg,rgba(22,27,34,.85),rgba(22,27,34,.78))}
+.ca-hero h1{font-size:clamp(1.6rem,1.1rem + 2.2vw,2.6rem);font-weight:800;margin:0 0 .35rem}
+.ca-hero p{margin:0;color:var(--muted)}
+.ca-badge{position:absolute;right:16px;top:16px;display:inline-flex;align-items:center;gap:.6rem;background:var(--card);
+  border:1px solid var(--border);border-radius:999px;padding:.45rem .7rem;box-shadow:0 6px 16px rgba(13,38,76,.08)}
+.ca-badge .avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--grad);color:#fff;font-weight:800}
+
+/* stepper */
+.ca-stepper{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.ca-step{display:inline-flex;align-items:center;gap:.6rem;background:var(--card);border:1px solid var(--border);
+  padding:.35rem .65rem;border-radius:999px;color:var(--text);box-shadow:0 6px 12px rgba(13,38,76,.06)}
+.ca-step .num{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;background:var(--grad);font-size:.8rem}
+.ca-step.is-muted{opacity:.6}
+
+/* MAIN GRID (LEFT rail + RIGHT form) */
+.ca-main{display:grid;grid-template-columns:.9fr 1.1fr;gap:18px;margin-top:18px}
+@media (max-width:980px){.ca-main{grid-template-columns:1fr}}
+
+/* left rail */
+.ca-rail-card{border:1px solid var(--border);border-radius:16px;background:var(--card);box-shadow:var(--shadow);padding:16px}
+.ca-rail-title{font-weight:800;margin-bottom:6px}
+.ca-benefit{display:flex;gap:10px;margin:10px 0}
+.ca-benefit i{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:rgba(80,227,194,.15)}
+:root[data-theme="dark"] .ca-benefit i{background:rgba(80,227,194,.12)}
+/* mini KPI tiles – title only */
+.ca-mini-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.ca-mini-kpi{
+  display:flex;align-items:center;gap:.6rem;
+  border:1px solid var(--border);border-radius:12px;background:var(--card);
+  box-shadow:0 6px 14px rgba(13,38,76,.06);padding:12px
+}
+.ca-mini-kpi i{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(74,144,226,.12);color:#4a90e2}
+.ca-mini-kpi .kpi-title{font-weight:800}
+
+/* right form */
+.ca-right .tile-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.ca-tile{position:relative;border:1px solid var(--border);border-radius:16px;background:var(--card);box-shadow:var(--shadow);
+  padding:16px;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease}
+.ca-tile:hover{transform:translateY(-2px);box-shadow:0 18px 38px rgba(13,38,76,.14)}
+.ca-tile input[type="radio"]{position:absolute;inset:0;opacity:0}
+.ca-tile .title{font-weight:700;margin-bottom:4px}
+.ca-tile .desc{color:var(--muted);font-size:.95rem}
+.ca-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.32rem .6rem;border-radius:999px;margin-top:8px;border:1px solid var(--border);
+  background:var(--chip-bg);box-shadow:0 6px 14px rgba(13,38,76,.06);color:var(--text);font-weight:600;font-size:.85rem}
+.ca-tile.is-checked{
+  border-color:transparent;
+  background:linear-gradient(var(--card),var(--card)) padding-box,
+             linear-gradient(120deg, rgba(74,144,226,.9), rgba(80,227,194,.9)) border-box
+}
+:root[data-theme="dark"] .ca-tile.is-checked{
+  background:linear-gradient(var(--card),var(--card)) padding-box,
+             linear-gradient(120deg, rgba(74,144,226,.8), rgba(80,227,194,.8)) border-box
+}
+.ca-page-select{margin-top:10px;display:grid;grid-template-columns:1fr auto;gap:10px}
+.ca-page-select .form-select{background:var(--card);color:var(--text)}
+
+.ca-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:14px}
+
+/* stronger, but on-brand, disclaimer */
+.ca-disclaimer{
+  margin-top:10px;font-size:.95rem;font-weight:600;
+  color:color-mix(in oklab, var(--text) 88%, transparent)
+}
+
+/* Centered bottom shortcuts */
+.ca-shortcuts{
+  margin-top:18px;display:flex;justify-content:center
+}
+.ca-shortcuts .pill{
+  display:inline-flex;align-items:center;gap:.6rem;
+  background:var(--card);border:1px solid var(--border);border-radius:999px;
+  padding:.5rem .9rem;box-shadow:0 6px 16px rgba(13,38,76,.10);
+  font-weight:700;color:color-mix(in oklab, var(--text) 92%, transparent)
+}
+.ca-shortcuts kbd{
+  background:#e5e7eb;border-radius:6px;padding:.1rem .4rem;font-weight:700
+}
+:root[data-theme="dark"] .ca-shortcuts kbd{background:#1f2937;color:#e5e7eb}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="center-box">
-    <div class="main-title" style="margin-bottom:1.2em;">Choose Account</div>
-    <div class="card">
-        <form method="post" autocomplete="off">
-            <div class="account-options">
-                <div class="radio-row">
-                    <input type="radio" id="profile" name="account_type" value="user" checked>
-                    <label for="profile" class="account-label">
-                        Use my profile
-                        <span class="username">({{ user['name'] }})</span>
-                    </label>
-                </div>
-                {% if pages %}
-                <div class="radio-row">
-                    <input type="radio" id="page" name="account_type" value="page">
-                    <label for="page" class="account-label">
-                        Use my page:
-                    </label>
-                    <select name="page_id" id="page_id">
-                        {% for page in pages %}
-                        <option value="{{ page['id'] }}">{{ page['name'] }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
+<div class="ca-wrap">
+
+  <!-- HERO -->
+  <div class="ca-hero">
+    <h1>Choose an Account</h1>
+    <p>Select where you’d like to fetch posts and comments from. You can change this later.</p>
+
+    <div class="ca-stepper">
+      <span class="ca-step"><span class="num">1</span> Choose account</span>
+      <span class="ca-step is-muted"><span class="num">2</span> Pick post</span>
+      <span class="ca-step is-muted"><span class="num">3</span> Analyze &amp; report</span>
+    </div>
+
+    {% if user %}
+    <div class="ca-badge">
+      <span class="avatar">{{ (user['name']|default('U'))[0] }}</span>
+      <div>
+        <div class="text-muted-compact">Signed in as</div>
+        <div class="fw-600">{{ user['name'] }}</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- MAIN GRID: LEFT = benefits/KPIs, RIGHT = form/disclaimer -->
+  <div class="ca-main">
+
+    <!-- LEFT rail -->
+    <div class="ca-left">
+      <div class="ca-rail-card">
+        <div class="ca-rail-title">What you’ll get</div>
+        <div class="ca-benefit"><i class="fa fa-heart"></i><div><b>Sentiment &amp; emotions</b><br><span class="text-muted">Instantly see mood &amp; tone across comments.</span></div></div>
+        <div class="ca-benefit"><i class="fa fa-shield-alt"></i><div><b>Toxicity &amp; spam filters</b><br><span class="text-muted">Flag hate speech, spam and off-topic noise.</span></div></div>
+        <div class="ca-benefit"><i class="fa fa-chart-line"></i><div><b>Engagement KPIs</b><br><span class="text-muted">Likes, comments, shares—clean and comparable.</span></div></div>
+
+        <!-- KPI tiles (title only) -->
+        <div class="ca-mini-kpis">
+          <div class="ca-mini-kpi"><i class="fa fa-bolt"></i><div class="kpi-title">1-click analysis</div></div>
+          <div class="ca-mini-kpi"><i class="fa fa-file-export"></i><div class="kpi-title">PDF/CSV export</div></div>
+          <div class="ca-mini-kpi"><i class="fa fa-magic"></i><div class="kpi-title">AI replies</div></div>
+        </div>
+      </div>
+
+      <div class="ca-rail-card mt-2">
+        <div class="ca-rail-title">Privacy &amp; security</div>
+        <div class="text-muted">OAuth via Meta. Read-only access. You can revoke any time in Facebook settings. No credentials stored.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: form + stronger disclaimer -->
+    <div class="ca-right">
+      <form method="post" autocomplete="off" id="chooseForm">
+        <div class="tile-grid">
+
+          <!-- Profile -->
+          <label class="ca-tile" id="tile-profile">
+            <input type="radio" name="account_type" id="profile" value="user" {% if not pages %}checked{% endif %}/>
+            <div class="title"><i class="fa fa-user-circle"></i> &nbsp;Use my profile</div>
+            <div class="desc">Analyze posts and comments from your personal profile.</div>
+            <div class="ca-chip"><i class="fa fa-id-badge"></i> {{ user['name'] }}</div>
+          </label>
+
+          <!-- Page -->
+          <label class="ca-tile" id="tile-page" {% if not pages %}style="opacity:.6;pointer-events:none"{% endif %}>
+            <input type="radio" name="account_type" id="page" value="page" />
+            <div class="title"><i class="fa fa-briefcase"></i> &nbsp;Use a Facebook Page</div>
+            <div class="desc">
+              Analyze posts and comments from a connected Page you manage.
+              {% if not pages %}<br><small class="text-muted">(No pages detected for this account)</small>{% endif %}
             </div>
 
-            <!-- Updated button -->
-            <button type="submit" class="btn-continue">
-                Continue
-            </button>
-        </form>
+            {% if pages %}
+            <div class="ca-page-select">
+              <select class="form-select" name="page_id" id="page_id" disabled>
+                {% for page in pages %}
+                  <option value="{{ page['id'] }}">{{ page['name'] }}</option>
+                {% endfor %}
+              </select>
+              <span class="ca-chip"><i class="fa fa-check-circle"></i> Manager</span>
+            </div>
+            {% endif %}
+          </label>
+
+        </div>
+
+        <div class="ca-actions">
+          <button type="submit" class="btn btn-gradient btn-shimmer px-4 py-2" id="continueBtn">Continue</button>
+        </div>
+
+        <div class="ca-disclaimer">
+          We never post on your behalf. Permissions are used only to read your posts &amp; comments for analysis.
+        </div>
+      </form>
     </div>
+  </div>
+
+  <!-- Bottom-center shortcuts -->
+  <div class="ca-shortcuts">
+    <div class="pill">
+      Shortcuts:&nbsp; <kbd>P</kbd> Profile &nbsp; <kbd>G</kbd> Page &nbsp; <kbd>Enter</kbd> Continue
+    </div>
+  </div>
 </div>
+
+<!-- Confetti layer -->
+<div class="confetti-area" aria-hidden="true"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const form = document.getElementById('chooseForm');
+  const tiles = { profile: document.getElementById('tile-profile'), page: document.getElementById('tile-page') };
+  const radios = { profile: document.getElementById('profile'), page: document.getElementById('page') };
+  const pageSelect = document.getElementById('page_id');
+  const continueBtn = document.getElementById('continueBtn');
+  const confettiArea = document.querySelector('.confetti-area');
+
+  // restore last pick
+  try{
+    const lastType = sessionStorage.getItem('acctType');
+    const lastPage = sessionStorage.getItem('acctPage');
+    if (lastType && radios[lastType]) {
+      radios[lastType].checked = true;
+      if (lastType==='page' && pageSelect){ pageSelect.disabled = false; if (lastPage) pageSelect.value=lastPage; }
+    } else {
+      radios.profile && (radios.profile.checked = true);
+    }
+  }catch(e){}
+
+  function updateUI(){
+    const pageOn = radios.page && radios.page.checked;
+    tiles.profile.classList.toggle('is-checked', radios.profile && radios.profile.checked);
+    tiles.page.classList.toggle('is-checked', pageOn);
+    if (pageSelect) pageSelect.disabled = !pageOn;
+  }
+  updateUI();
+
+  Object.entries(tiles).forEach(([k,t])=>{
+    t && t.addEventListener('click', ()=>{
+      if (radios[k]){ radios[k].checked=true; updateUI(); }
+    });
+  });
+
+  // Shortcuts (outside form fields)
+  document.addEventListener('keydown', (e)=>{
+    const tag = (e.target.tagName||'').toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+    const k=e.key.toLowerCase();
+    if(k==='p'){ radios.profile && (radios.profile.checked=true); updateUI(); }
+    if(k==='g'){ radios.page && (radios.page.checked=true); updateUI(); }
+    if(e.key==='enter'){ e.preventDefault(); continueBtn.click(); }
+  });
+
+  // Save & confetti (once)
+  form.addEventListener('submit', (e)=>{
+    const type = radios.page && radios.page.checked ? 'page' : 'profile';
+    try{
+      sessionStorage.setItem('acctType', type);
+      if(type==='page' && pageSelect) sessionStorage.setItem('acctPage', pageSelect.value||'');
+    }catch(err){}
+
+    try{
+      if(!sessionStorage.getItem('chooseConfetti')){
+        sessionStorage.setItem('chooseConfetti','1');
+        const r = continueBtn.getBoundingClientRect();
+        doConfetti(r.left + r.width/2, r.top + window.scrollY);
+        setTimeout(()=>form.submit(), 10);
+        e.preventDefault();
+      }
+    }catch(err){}
+  });
+
+  function doConfetti(x,y){
+    const n=26;
+    for(let i=0;i<n;i++){
+      const p=document.createElement('span');
+      p.className='confetti';
+      p.style.left=x+'px'; p.style.top=y+'px';
+      p.style.setProperty('--dx',((Math.random()-.5)*240).toFixed(1)+'px');
+      p.style.setProperty('--dy',((Math.random()-.2)*320).toFixed(1)+'px');
+      p.style.setProperty('--rz',(Math.random()*720-360).toFixed(1)+'deg');
+      p.style.setProperty('--i',Math.random().toFixed(2));
+      confettiArea.appendChild(p);
+      setTimeout(()=>p.remove(),1200);
+    }
+  }
+})();
+</script>
 {% endblock %}

@@ -1,24 +1,120 @@
 {% extends "base.html" %}
+{% block title %}Facebook Comment Analyzer{% endblock %}
+
+{% block head %}
+<style>
+  /* === Minimal, isolated rules just for this page === */
+
+  .hero-wrap { height: 100vh; }
+
+  /* Left: fixed gradient and white text */
+  .landing-left{
+    background: linear-gradient(135deg, #4a90e2 0%, #50e3c2 100%);
+    color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    padding: 3rem 2rem;
+  }
+  .landing-left h2,
+  .landing-left p{ color:#fff; }
+
+  /* Typographic scale matches the rest of your site */
+  .landing-left .hero-inner{ max-width: 640px; text-align:center; }
+  .landing-left .hero-title{
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1.25rem;
+    font-size: clamp(2rem, 1.2rem + 2.8vw, 3.25rem);
+  }
+  .landing-left .hero-sub{
+    font-size: clamp(1rem, .9rem + .5vw, 1.25rem);
+    opacity: .95;
+  }
+
+  /* Right pane: uses theme variables via base.html */
+  .landing-right{
+    background: transparent;
+    display:flex; align-items:center; justify-content:center;
+    padding: 3rem 2rem;
+  }
+  .landing-right .panel{
+    text-align:center;
+  }
+  .landing-right .title{
+    color: var(--text);
+    margin-bottom: .75rem;
+    font-weight: 800;
+    font-size: clamp(1.4rem, 1rem + 1.2vw, 2rem);
+  }
+  .landing-right .sub{
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+  }
+
+  /* Re-use your gradient button + shimmer from global CSS */
+  .btn-gradient{
+    background: var(--grad);
+    color:#fff; border:none; border-radius: 10px;
+    box-shadow: 0 10px 24px rgba(74,144,226,.25);
+  }
+  .btn-gradient:hover{ filter: brightness(.96); color:#fff; }
+  .btn-shimmer{ position:relative; overflow:hidden; }
+  .btn-shimmer::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(110deg, transparent 0%, rgba(255,255,255,.25) 40%, transparent 60%);
+    transform:translateX(-100%); animation:shimmer 2.5s linear infinite;
+    animation-play-state: paused;
+  }
+  .btn-shimmer:hover::after{ animation-play-state: running; }
+  @keyframes shimmer{ to { transform: translateX(100%); } }
+
+  /* Responsive niceties */
+  @media (max-width: 991px){
+    .hero-wrap{ height:auto; }
+    .landing-left, .landing-right{ min-height: 48vh; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid vh-100 p-0">
-    <div class="row vh-100 g-0">
-        <!-- Welcome Note Section -->
-        <div class="col-md-6 bg-gradient-primary text-white d-flex align-items-center justify-content-center p-5">
-            <div class="text-center">
-                <h2 class="display-5 fw-bold mb-4">Welcome to Your Insight Hub!</h2>
-                <p class="lead">Discover powerful insights from your Facebook post comments with ease. Our tool is designed to simplify analysis and enhance your engagement strategy.</p>
-            </div>
-        </div>
-        <!-- Login Section -->
-        <div class="col-md-6 d-flex align-items-center justify-content-center p-5 bg-light">
-            <div class="text-center">
-                <h1 class="h3 text-dark mb-4">Facebook Comment Analyzer</h1>
-                <p class="text-muted mb-4">Get started with a single click.</p>
-                <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg px-5 py-3" style="background: linear-gradient(90deg, #4a90e2, #50e3c2); border: none; border-radius: 10px; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);">
-                    Login with Facebook
-                </a>
-            </div>
-        </div>
+<div class="container-fluid p-0">
+  <div class="row g-0 hero-wrap">
+    <!-- Left: Gradient welcome -->
+    <div class="col-md-6 landing-left">
+      <div class="hero-inner">
+        <h2 class="hero-title">Welcome to Your Insight Hub!</h2>
+        <p class="hero-sub">
+          Discover powerful insights from your Facebook post comments with ease.
+          Our tool is designed to simplify analysis and enhance your engagement strategy.
+        </p>
+      </div>
     </div>
+
+    <!-- Right: Title + single CTA -->
+    <div class="col-md-6 landing-right">
+      <div class="panel">
+        <div class="title">Facebook Comment Analyzer</div>
+        <div class="sub">Get started with a single click.</div>
+        <a id="loginBtn"
+           href="{{ url_for('login') }}"
+           class="btn btn-gradient btn-shimmer btn-lg px-5 py-3">
+          Login with Facebook
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Small UX nicety: Enter/Space highlights the CTA (no auto-login)
+  document.addEventListener('keydown', (e) => {
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if ((e.key === 'Enter' || e.key === ' ') && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+      const btn = document.getElementById('loginBtn');
+      if (btn) btn.focus();
+    }
+  });
+</script>
 {% endblock %}
