@@ -21,3 +21,11 @@ planner.db
 data_insights_history.json
 .pytest_cache/
 .DS_Store
+venv/
+__pycache__/
+*.pyc
+.env
+planner.db
+data_insights_history.json
+.pytest_cache/
+.DS_Store
