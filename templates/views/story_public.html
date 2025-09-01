@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5">
+  <h2>Shareable Story</h2>
+  <p class="text-muted-compact">Read-only snapshot generated for sharing.</p>
+  <div class="card p-3">
+    <div>This is a public placeholder. You can render highlights and key charts here using the same insights JSON.</div>
+    <div class="text-muted-compact mt-2">Token: {{ token }}</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,404 @@
+<div class="page-shell ana-root">
+  <div class="hero ana-hero">
+    <div class="hero__inner">
+      <div>
+        <h1 class="hero-title">Overview</h1>
+        <p class="hero-subtitle">How we performed and what to do next.</p>
+      </div>
+      <div class="ana-hero-actions">
+        <a class="btn" href="{{ url_for('export_comments_csv', post_id=post_id) }}">Export CSV</a>
+        <button class="btn" id="anaCelebrateBtn" title="Small wins matter!">Celebrate Wins 🎉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Highlights -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xxl-8">
+      <div class="card p-3 ana-reveal">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="mb-1">Top Highlights</h6>
+            <small class="text-muted-compact">Snapshot of health and mood for {{ extras.window_label or 'this post' }}.</small>
+          </div>
+          <small class="text-muted-compact">Window: {{ extras.window_label or 'this post' }}</small>
+        </div>
+
+        {% set k = data.kpis or {} %}
+        {% set d = extras.delta or {} %}
+        <div class="ana-chip-row mt-2">
+          <!-- Advocacy -->
+          <a class="ana-chip" tabindex="0" href="{{ url_for('analyze_view', post_id=post_id, view='benchmark') }}">
+            🎯 Advocacy: <b>{{ k.advocacy }}%</b>
+            {% set dv = d.get('advocacy', 0) %}
+            <small class="ana-delta {{ 'ana-delta--up' if dv>0 else ('ana-delta--down' if dv<0 else 'ana-delta--flat') }}">
+              {{ '▲' if dv>0 else ('▼' if dv<0 else '–') }} {{ (dv|abs) }}
+            </small>
+          </a>
+
+          <!-- Safety -->
+          <a class="ana-chip" tabindex="0" href="{{ url_for('analyze_view', post_id=post_id, view='safety') }}">
+            🛡️ Safety: <b>{{ k.safety_score }}</b>
+            {% set dv = d.get('safety_score', 0) %}
+            <small class="ana-delta {{ 'ana-delta--up' if dv>0 else ('ana-delta--down' if dv<0 else 'ana-delta--flat') }}">
+              {{ '▲' if dv>0 else ('▼' if dv<0 else '–') }} {{ (dv|abs) }}
+            </small>
+          </a>
+
+          <!-- Positivity among polar -->
+          <span class="ana-chip" tabindex="0" title="Share of positive among positive+negative">
+            🙂 Positivity: <b>{{ k.positivity_ratio or 0 }}%</b>
+            {% set dv = d.get('positivity_ratio', 0) %}
+            <small class="ana-delta {{ 'ana-delta--up' if dv>0 else ('ana-delta--down' if dv<0 else 'ana-delta--flat') }}">
+              {{ '▲' if dv>0 else ('▼' if dv<0 else '–') }} {{ (dv|abs) }}
+            </small>
+          </span>
+
+          <!-- Languages -->
+          <span class="ana-chip" tabindex="0" title="Unique languages detected">
+            🌍 Languages: <b>{{ k.language_diversity or 1 }}</b>
+            {% set dv = d.get('language_diversity', 0) %}
+            <small class="ana-delta {{ 'ana-delta--up' if dv>0 else ('ana-delta--down' if dv<0 else 'ana-delta--flat') }}">
+              {{ '▲' if dv>0 else ('▼' if dv<0 else '–') }} {{ (dv|abs) }}
+            </small>
+          </span>
+
+          <!-- Emoji usage -->
+          <span class="ana-chip" tabindex="0" title="Comments with at least one emoji">
+            😊 Emoji use: <b>{{ k.emoji_pct or 0 }}%</b>
+            {% set dv = d.get('emoji_pct', 0) %}
+            <small class="ana-delta {{ 'ana-delta--up' if dv>0 else ('ana-delta--down' if dv<0 else 'ana-delta--flat') }}">
+              {{ '▲' if dv>0 else ('▼' if dv<0 else '–') }} {{ (dv|abs) }}
+            </small>
+          </span>
+
+          <!-- Best hour & drills -->
+          <span class="ana-chip" tabindex="0">⏰ Best Hour: <b>{{ "%02d"|format(k.best_hour) if k.best_hour is not none else '-' }}:00 UTC</b></span>
+          <a class="ana-chip" tabindex="0" href="{{ url_for('analyze_view', post_id=post_id, view='top_comments') }}?sent=negative">🧭 View negatives</a>
+          <a class="ana-chip" tabindex="0" href="{{ url_for('analyze_view', post_id=post_id, view='content_intel') }}">#️⃣ Keyword: <b>{{ k.top_keyword or '—' }}</b></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next best actions -->
+    <div class="col-12 col-xxl-4">
+      <div class="card p-3 ana-reveal">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-1">Next best actions</h6>
+          <small class="text-muted-compact">Auto-generated</small>
+        </div>
+        <ul class="ana-toplist">
+          {% for a in (extras.actions or [])[:3] %}
+            <li>{{ a }}</li>
+          {% else %}
+            <li class="text-muted-compact">Nothing urgent — keep engaging 🎉</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI rows -->
+  <div class="row g-3 mb-1">
+    {% set k1 = [
+      ('total_comments','Total Comments'),
+      ('unique_users','Unique Users'),
+      ('total_reactions','Total Reactions'),
+      ('avg_reactions_per_comment','Avg Reactions / Comment'),
+    ] %}
+    {% for key,label in k1 %}
+      <div class="col-6 col-lg-3">
+        <div class="ana-kpi card p-3 ana-reveal">
+          <div class="ana-kpi__label">{{ label }}</div>
+          <div class="ana-kpi__value" data-countup="{{ (k[key] or 0) }}">{{ (k[key] or 0) }}</div>
+          {% set dv = (extras.delta or {}).get(key, 0) %}
+          <div class="ana-kpi__delta {{ 'ana-delta--up' if dv>0 else ('ana-delta--down' if dv<0 else 'ana-delta--flat') }}">
+            {{ '▲' if dv>0 else ('▼' if dv<0 else '–') }} {{ (dv|abs) }}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="row g-3 mb-3">
+    {% set k2 = [
+      ('median_engagement','Median Engagement'),
+      ('emoji_pct','Emoji Usage %'),
+      ('language_diversity','Language Diversity'),
+      ('positivity_ratio','Positivity % (polar)'),
+    ] %}
+    {% for key,label in k2 %}
+      <div class="col-6 col-lg-3">
+        <div class="ana-kpi card p-3 ana-reveal">
+          <div class="ana-kpi__label">{{ label }}</div>
+          <div class="ana-kpi__value" data-countup="{{ (k[key] or 0) }}">{{ (k[key] or 0) }}</div>
+          {% set dv = (extras.delta or {}).get(key, 0) %}
+          <div class="ana-kpi__delta {{ 'ana-delta--up' if dv>0 else ('ana-delta--down' if dv<0 else 'ana-delta--flat') }}">
+            {{ '▲' if dv>0 else ('▼' if dv<0 else '–') }} {{ (dv|abs) }}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Momentum + Sentiment + Top 3 Engaged -->
+  <div class="row g-3">
+    <!-- Momentum (frozen, no reflow) -->
+    <div class="col-12 col-xxl-6">
+      <div class="card p-3 ana-reveal">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-2">Momentum — {{ extras.window_label or 'this post' }}</h6>
+          {% if (data.kpis or {}).best_hour is not none %}
+            <span class="badge text-bg-light" title="Best hour of activity">Best hour: {{ "%02d"|format(data.kpis.best_hour) }}:00 UTC</span>
+          {% endif %}
+        </div>
+
+        <!-- fixed-height wrapper prevents layout shift -->
+        <div id="ovSparkWrap" class="position-relative" style="height:220px; width:100%;">
+          <canvas id="ovSpark" aria-label="Comments over time" role="img"></canvas>
+          <div id="bestHourBadge" class="ana-badge" title="Best hour"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xxl-3">
+      <div class="card p-3 ana-reveal">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-2">Sentiment Share — {{ extras.window_label or 'this post' }}</h6>
+          <small class="text-muted-compact">Exact values on hover</small>
+        </div>
+        <div class="ana-skel" id="skelDonut"></div>
+        <canvas id="ovSent" aria-label="Sentiment share" role="img"></canvas>
+      </div>
+    </div>
+
+    <div class="col-12 col-xxl-3">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Top 3 Engaged</h6>
+        <ul class="ana-toplist">
+          {% for r in (data.top_engaged or [])[:3] %}
+            <li>
+              <b>{{ r.user }}</b> — {{ r.text[:120] }}…
+              <span class="badge text-bg-secondary">eng {{ r.eng }}</span>
+              {% if r.link %}
+                <button class="btn btn-sm btn-outline-primary" onclick="replyHelper({{ (r.link or '')|tojson }}, {{ ('neutral')|tojson }})">Reply</button>
+              {% endif %}
+            </li>
+          {% else %}
+            <li class="text-muted-compact">No high-engagement comments yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* scoped */
+.ana-hero{ background:linear-gradient(135deg, rgba(255,255,255,.65), rgba(255,255,255,.3)); backdrop-filter:saturate(1.2) blur(2px); }
+.ana-hero .hero__inner{ display:flex; align-items:center; justify-content:space-between; }
+.ana-hero-actions .btn{ border-radius:12px; }
+
+.ana-chip-row{ display:flex; flex-wrap:wrap; gap:.5rem; }
+.ana-chip{ padding:.45rem .7rem; border-radius:999px; border:1px solid var(--border); background:var(--surface); text-decoration:none; color:inherit; outline-offset:3px; }
+.ana-chip:focus-visible{ outline:3px solid rgba(59,130,246,.5); }
+
+.ana-delta{ margin-left:.4rem; padding:.08rem .35rem; border-radius:8px; font-weight:700; font-size:.75rem; border:1px solid transparent; }
+.ana-delta--up{ color:#0a7d4f; background:rgba(10,125,79,.08); }
+.ana-delta--down{ color:#b42318; background:rgba(180,35,24,.08); }
+.ana-delta--flat{ color:#475569; background:rgba(71,85,105,.08); }
+
+.ana-kpi{ position:relative; transition:transform .25s ease, box-shadow .25s ease; }
+.ana-kpi:hover{ transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+.ana-kpi__label{ font-size:.85rem; color:var(--muted); }
+.ana-kpi__value{ font-size:1.9rem; font-weight:800; letter-spacing:.2px; }
+.ana-kpi__delta{ position:absolute; right:12px; bottom:10px; font-size:.8rem; }
+
+.ana-reveal{ opacity:0; transform:translateY(8px); transition:opacity .5s ease, transform .5s ease; }
+.ana-reveal._in{ opacity:1; transform:none; }
+
+.ana-toplist li{ margin-bottom:.6rem; display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+.ana-toplist .btn{ padding:.15rem .45rem; border-radius:8px; }
+
+.ana-skel{ height:140px; width:100%; border-radius:12px; background:linear-gradient(90deg, rgba(0,0,0,.05) 25%, rgba(0,0,0,.08) 37%, rgba(0,0,0,.05) 63%); background-size:400% 100%; animation:sk 1.2s ease-in-out infinite; }
+#skelDonut{ height:220px; }
+@keyframes sk { 0%{background-position:100% 0} 100%{background-position:0 0} }
+
+.ana-badge{ position:absolute; top:8px; right:8px; background:var(--surface-2); border:1px solid var(--border); padding:.2rem .5rem; border-radius:8px; font-size:.75rem; display:none; }
+
+/* confetti */
+.ana-confetti{ position:fixed; inset:auto 0 20% 0; margin:auto; width:0; height:0; text-align:center; z-index:9999; animation:anaPop .9s ease both; }
+.ana-confetti i{ font-size:56px; filter:drop-shadow(0 6px 20px rgba(0,0,0,.15)); }
+@keyframes anaPop{ 0%{ transform:translateY(20px) scale(.8); opacity:0; } 40%{ transform:translateY(-10px) scale(1.1); opacity:1; } 100%{ transform:translateY(-40px) scale(1); opacity:0; }
+</style>
+
+<script>
+(function(){
+  if (window.__anaOverviewRendered) return;   // prevent double init
+  window.__anaOverviewRendered = true;
+
+  const D = {{ data|tojson }};
+  const K = D.kpis || {};
+
+  // Count-up (one-shot)
+  const counters = document.querySelectorAll('[data-countup]');
+  const obs = new IntersectionObserver(es=>{
+    es.forEach(e=>{
+      if(!e.isIntersecting) return;
+      const el=e.target;
+      if (el.dataset.counted === "1") { obs.unobserve(el); return; }
+      el.dataset.counted = "1";
+      const to=+el.dataset.countup, dur=600, t0=performance.now();
+      const decimals = String(to).includes('.') ? 1 : 0;
+      function step(t){ const p=Math.min(1,(t-t0)/dur); el.textContent=(to*p).toFixed(decimals); if(p<1) requestAnimationFrame(step); }
+      requestAnimationFrame(step); obs.unobserve(el);
+    });
+  },{threshold:.5});
+  counters.forEach(el=>obs.observe(el));
+
+  // Reveal on scroll (one-shot)
+  const rev = document.querySelectorAll('.ana-reveal');
+  const rObs = new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('_in'); rObs.unobserve(e.target);} }),{threshold:.15});
+  rev.forEach(el=>rObs.observe(el));
+
+  // Shared reply helper
+  window.replyHelper = (link, sentiment) =>{
+    let msg="Thanks for sharing your thoughts!";
+    if (sentiment==='positive') msg="Thanks for the love! 🙏 Appreciate your support.";
+    else if (sentiment==='negative') msg="Sorry this missed the mark. We’re listening—mind sharing more details by DM?";
+    else if (sentiment==='neutral') msg="Thanks for commenting! If you’ve got ideas, we’d love to hear them.";
+    navigator.clipboard?.writeText(msg);
+    window.open(link || 'https://www.facebook.com/', '_blank');
+  };
+
+  // Lazy load Chart.js once
+  function needChart(cb){
+    if (window.Chart) return cb();
+    const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/chart.js'; s.onload=cb; document.head.appendChild(s);
+  }
+
+  needChart(()=>{
+    // ===== Momentum (frozen: no animation, no responsive reflow) =====
+    const tl = D.timeline || {labels:[], values:[]};
+    const spark = document.getElementById('ovSpark');
+    const wrap  = document.getElementById('ovSparkWrap');
+
+    if (spark && wrap) {
+      const dpr  = window.devicePixelRatio || 1;
+      const rect = wrap.getBoundingClientRect();
+      const pxW  = Math.max(320, Math.floor(rect.width * dpr));
+      const pxH  = Math.floor(wrap.clientHeight * dpr);
+
+      spark.width  = pxW;
+      spark.height = pxH;
+      spark.style.width  = rect.width + 'px';
+      spark.style.height = wrap.clientHeight + 'px';
+
+      const ctx  = spark.getContext('2d');
+      const grad = ctx.createLinearGradient(0,0,0,pxH);
+      grad.addColorStop(0,'rgba(54,162,235,.35)');
+      grad.addColorStop(1,'rgba(54,162,235,0)');
+
+      const lowN = (K.total_comments||0) < 30;
+      let chartConfig;
+
+      if (!lowN && (tl.values||[]).length >= 2) {
+        // line + dotted 1-step forecast
+        let labels = (tl.labels||[]).slice();
+        let values = (tl.values||[]).slice();
+        const last = values[values.length-1], prev = values[values.length-2];
+        const slope = last - prev;
+        const forecastY = Math.max(0, Math.round(last + slope));
+        labels = labels.concat(['+1d']);
+
+        chartConfig = {
+          type:'line',
+          data:{ labels,
+            datasets:[
+              {label:'Comments', data: values.concat([null]), tension:.35, borderWidth:2, fill:true, backgroundColor:grad, pointRadius:0},
+              {label:'Forecast', data: values.map(()=>null).concat([forecastY]), tension:.35, borderWidth:2, borderDash:[5,5], pointRadius:0}
+            ]
+          },
+          options:{
+            responsive:false,
+            animation:false,
+            plugins:{ legend:{ position:'top' }, tooltip:{enabled:true} },
+            elements:{ point:{ radius:0 } },
+            scales:{ x:{display:false}, y:{display:false} },
+            plugins: [{
+              id:'bestHourCue',
+              afterDatasetsDraw(chart){
+                if (K.best_hour == null) return;
+                const {ctx, chartArea:{left,right,top,bottom}} = chart;
+                const x = right - 48;
+                ctx.save(); ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.setLineDash([4,4]);
+                ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); ctx.restore();
+                const badge = document.getElementById('bestHourBadge');
+                if (badge){ badge.style.display='block'; badge.textContent=`Best ${String(K.best_hour).padStart(2,'0')}:00 UTC`; }
+              }
+            }]
+          }
+        };
+      } else {
+        // bar: comments by hour (better for small N)
+        const H = D.hourly || {labels:[], pos:[], neu:[], neg:[]};
+        const labels = H.labels || [];
+        const totals = labels.map((_,i)=> (H.pos?.[i]||0) + (H.neu?.[i]||0) + (H.neg?.[i]||0));
+        chartConfig = {
+          type:'bar',
+          data:{ labels, datasets:[{ label:'Comments by hour', data: totals }]},
+          options:{
+            responsive:false,
+            animation:false,
+            plugins:{ legend:{ position:'top' }, tooltip:{enabled:true} },
+            scales:{ x:{ grid:{display:false} }, y:{ grid:{color:'rgba(0,0,0,.06)'} } }
+          }
+        };
+      }
+
+      if (window.Chart) {
+        Chart.defaults.animation = false;
+        Chart.defaults.responsiveAnimationDuration = 0;
+      }
+      new Chart(spark, chartConfig);
+    }
+
+    // ===== Sentiment donut with center label =====
+    const s = D.sentiment || {labels:[], values:[]};
+    const dd = document.getElementById('ovSent');
+    const skelDonut = document.getElementById('skelDonut');
+    if (dd){
+      const centerText = {
+        id:'centerText',
+        afterDraw(chart){
+          const {width, height, ctx} = chart;
+          const total = (s.values||[]).reduce((a,b)=>a+b,0) || 0;
+          const pos = (s.labels||[]).reduce((n,lab,i)=> lab.toLowerCase().includes('pos') ? n + (s.values[i]||0) : n, 0);
+          const pct = total ? Math.round((pos/total)*100) : 0;
+          ctx.save();
+          ctx.textAlign='center';
+          ctx.fillStyle='rgba(0,0,0,.82)';
+          ctx.font='600 14px system-ui';
+          ctx.fillText('Positivity', width/2, height/2 - 8);
+          ctx.font='800 22px system-ui';
+          ctx.fillText(pct + '%', width/2, height/2 + 16);
+          ctx.restore();
+        }
+      };
+      new Chart(dd, {
+        type:'doughnut',
+        plugins:[centerText],
+        data:{ labels:s.labels, datasets:[{ data:s.values }]},
+        options:{ plugins:{ legend:{ position:'bottom' }, tooltip:{ enabled:true } }, cutout:'65%' }
+      });
+      skelDonut?.remove();
+    }
+  });
+
+  // Confetti micro moment
+  document.getElementById('anaCelebrateBtn')?.addEventListener('click', ()=>{
+    const p=document.createElement('div'); p.className='ana-confetti'; p.innerHTML='<i>🎉</i>'; document.body.appendChild(p);
+    setTimeout(()=>p.remove(),900);
+  });
+})();
+</script>

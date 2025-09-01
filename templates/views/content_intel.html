@@ -1,0 +1,41 @@
+<div class="page-shell ana-root">
+  <div class="hero">
+    <div class="hero__inner">
+      <div>
+        <h1 class="hero-title">Content Intelligence</h1>
+        <p class="hero-subtitle">What kind of content + phrasing drives outcomes.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-6">
+      <div class="card p-3">
+        <h6 class="mb-2">Top Hashtags</h6>
+        <ul class="ana-toplist">
+          {% for t in extras.top_tags %}
+            <li><b>{{ t.tag }}</b> — ×{{ t.count }}</li>
+          {% else %}
+            <li class="text-muted-compact">No hashtags detected.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="card p-3">
+        <h6 class="mb-2">CTA Signals</h6>
+        <div>Messages with CTA keywords: <b>{{ extras.cta_hits }}</b></div>
+        <div class="text-muted-compact mt-2">Keywords: buy, order, subscribe, follow, share, signup, call, dm</div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card p-3">
+        <h6 class="mb-2">Caption Readability (proxy)</h6>
+        <div>Average word length (chars): <b>{{ extras.readability }}</b></div>
+        <div class="text-muted-compact">Lower can indicate easier-to-skim captions; tune per audience.</div>
+      </div>
+    </div>
+  </div>
+</div>

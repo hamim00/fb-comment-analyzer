@@ -1,0 +1,60 @@
+/* Top Comments styling (scoped) */
+.tc-toolbar{display:flex;gap:.75rem;align-items:center;margin:8px 0 16px}
+.tc-input{border:1px solid var(--border,#e6e9ef);background:#fff;border-radius:10px;padding:.6rem .8rem}
+.tc-input.sm{padding:.4rem .6rem}
+.tc-select{border:1px solid var(--border,#e6e9ef);border-radius:10px;padding:.55rem .8rem;background:#fff}
+.tc-kpis{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));gap:.75rem;margin-bottom:14px}
+@media (max-width:1200px){.tc-kpis{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:768px){.tc-kpis{grid-template-columns:repeat(2,1fr)}}
+.tc-kpi{background:#fff;border-radius:14px;padding:.9rem 1rem;box-shadow:0 8px 20px rgba(20,40,80,.04)}
+.tc-kpi-label{font-size:.78rem;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.15rem}
+.tc-kpi-value{font-weight:800;font-size:1.35rem}
+.tc-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:8px 0 18px}
+@media (max-width:1100px){.tc-grid-2x2{grid-template-columns:1fr}}
+.tc-card{background:#fff;border-radius:16px;box-shadow:0 10px 24px rgba(18,38,70,.06)}
+.tc-card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #eef1f6}
+.tc-card-title{margin:0;font-weight:800}
+.tc-sort .chip{margin-left:.3rem}
+.tc-sort .chip.active{background:#eef3ff;border-color:#cfe2ff}
+.tc-list{padding:8px 12px 12px}
+.tc-empty{color:#8a93a6;padding:12px}
+.tc-item{display:flex;gap:.8rem;padding:10px 6px;border-bottom:1px dashed #edf1f6}
+.tc-item:last-child{border-bottom:none}
+.tc-avatar{width:36px;height:36px;background:linear-gradient(145deg,#e8eef9,#fff);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#222;font-weight:800}
+.tc-body{flex:1}
+.tc-line{display:flex;justify-content:space-between;gap:.6rem;align-items:center}
+.tc-text.clamp{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.tc-badges .pill{margin-left:.3rem}
+.tc-actions{display:flex;gap:.8rem;margin-top:.4rem}
+.tc-actions .link{color:#2563eb}
+.pill{border:1px solid #e8ecf4;border-radius:999px;padding:.1rem .5rem;font-size:.78rem}
+.pill.muted{color:#6b7280}
+.pill.positive{background:#ecfdf5;border-color:#c6f6d5;color:#047857}
+.pill.negative{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+.pill.neutral{background:#f3f4f6;border-color:#e5e7eb;color:#374151}
+.tc-table-wrap{margin-top:18px}
+
+.tc-modal{position:fixed;inset:0;z-index:1000}
+.tc-modal.hidden{display:none}
+.tc-modal-backdrop{position:absolute;inset:0;background:rgba(17,24,39,.45);backdrop-filter:blur(2px)}
+.tc-modal-card{position:relative;z-index:1;margin:6vh auto;background:#fff;border-radius:16px;max-width:720px;box-shadow:0 24px 64px rgba(10,20,50,.2)}
+.tc-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eef1f6}
+.tc-modal-body{padding:16px}
+.tc-modal-foot{display:flex;gap:.6rem;justify-content:flex-end;padding:12px 16px;border-top:1px solid #eef1f6}
+.icon-btn{background:#f2f5fb;border:none;border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:22px;line-height:1}
+.tc-textarea{width:100%;min-height:120px;border:1px solid #e6e9ef;border-radius:12px;padding:.8rem}
+.tc-sugg{display:block;width:100%;text-align:left;border:1px solid #e9edf5;background:#f8fafc;border-radius:10px;padding:.55rem .7rem;margin-bottom:.45rem}
+.tc-flex{display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-top:.6rem}
+.tc-saved{background:#fafbfe;border:1px solid #eef1f6;border-radius:12px;padding:.6rem}
+.tc-saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+.tc-saved-list{display:grid;gap:.35rem;max-height:160px;overflow:auto}
+.tc-saved-item{display:flex;gap:.4rem;align-items:center}
+.tc-saved-item .ghost{border:1px dashed #d9e2f0;border-radius:10px;padding:.35rem .55rem;background:#fff}
+.tc-schedule .lbl{font-size:.85rem;color:#6b7280;margin-bottom:.25rem;display:block}
+.btn.primary{background:#4f46e5;color:#fff}
+.btn.ghost{background:#fff;border:1px solid #e6e9ef}
+.btn.sm{padding:.3rem .6rem;border-radius:10px}
+.btn.xs{padding:.2rem .45rem;border-radius:9px;font-size:.8rem}
+.link{background:none;border:none;color:#2563eb;cursor:pointer}
+.chip{border:1px solid #e2e8f0;padding:.2rem .5rem;border-radius:999px;background:#fff}
+.chip.sm{font-size:.78rem}

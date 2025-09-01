@@ -1,0 +1,355 @@
+{% set k = extras.kpis or {} %}
+{% set lists = extras.lists or {} %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Top Comments</title>
+
+  <style>
+    /* ==== Top Comments: page-scoped CSS (no external file needed) ==== */
+    :root{
+      --border:#e6e9ef;
+      --muted:#6b7280;
+      --shadow:0 10px 24px rgba(18,38,70,.06);
+      --card:#fff;
+      --bg:#f7f9fc;
+      --primary:#4f46e5;
+      --link:#2563eb;
+    }
+    .page-head{margin-bottom:12px}
+    .title.xl{font-size:2.2rem;font-weight:900;margin:0}
+    .sub{color:#667085;margin:.25rem 0 0}
+
+    .tc-toolbar{display:flex;gap:.75rem;align-items:center;margin:12px 0 16px}
+    .tc-input{border:1px solid var(--border);background:#fff;border-radius:10px;padding:.6rem .8rem}
+    .tc-input.sm{padding:.4rem .6rem}
+    .tc-select{border:1px solid var(--border);border-radius:10px;padding:.55rem .8rem;background:#fff}
+    .btn{border:1px solid var(--border);background:#fff;border-radius:12px;padding:.55rem .9rem;cursor:pointer}
+    .btn.ghost{background:#fff}
+    .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .btn.sm{padding:.3rem .6rem;border-radius:10px}
+    .btn.xs{padding:.24rem .45rem;border-radius:9px;font-size:.8rem}
+    .link{background:none;border:none;color:var(--link);cursor:pointer}
+
+    /* KPI ribbon */
+    .tc-kpis{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));gap:.75rem;margin-bottom:14px}
+    @media (max-width:1200px){.tc-kpis{grid-template-columns:repeat(4,1fr)}}
+    @media (max-width:768px){.tc-kpis{grid-template-columns:repeat(2,1fr)}}
+    .tc-kpi{background:#fff;border-radius:14px;padding:.9rem 1rem;box-shadow:var(--shadow)}
+    .tc-kpi-label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.15rem}
+    .tc-kpi-value{font-weight:800;font-size:1.35rem}
+
+    /* 2x2 lists */
+    .tc-grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:8px 0 18px}
+    @media (max-width:1100px){.tc-grid-2x2{grid-template-columns:1fr}}
+    .tc-card{background:var(--card);border-radius:16px;box-shadow:var(--shadow)}
+    .tc-card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #eef1f6}
+    .tc-card-title{margin:0;font-weight:800}
+    .chip{border:1px solid #e2e8f0;padding:.2rem .5rem;border-radius:999px;background:#fff}
+    .chip.sm{font-size:.78rem}
+    .tc-sort .chip{margin-left:.3rem}
+    .tc-sort .chip.active{background:#eef3ff;border-color:#cfe2ff}
+    .tc-list{padding:8px 12px 12px}
+    .tc-empty{color:#8a93a6;padding:12px}
+    .tc-item{display:flex;gap:.8rem;padding:10px 6px;border-bottom:1px dashed #edf1f6}
+    .tc-item:last-child{border-bottom:none}
+    .tc-avatar{width:36px;height:36px;background:linear-gradient(145deg,#e8eef9,#fff);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#222;font-weight:800}
+    .tc-body{flex:1}
+    .tc-line{display:flex;justify-content:space-between;gap:.6rem;align-items:center}
+    .tc-text.clamp{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .tc-badges .pill{margin-left:.3rem}
+    .tc-actions{display:flex;gap:.8rem;margin-top:.4rem}
+    .pill{border:1px solid #e8ecf4;border-radius:999px;padding:.1rem .5rem;font-size:.78rem}
+    .pill.muted{color:#6b7280}
+    .pill.positive{background:#ecfdf5;border-color:#c6f6d5;color:#047857}
+    .pill.negative{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+    .pill.neutral{background:#f3f4f6;border-color:#e5e7eb;color:#374151}
+
+    .tc-table-wrap{margin-top:18px}
+    .table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    .table thead th{font-weight:700;text-align:left;color:#475569;font-size:.9rem;padding:0 .6rem}
+    .table tbody tr{background:#fff;box-shadow:var(--shadow)}
+    .table td{padding:.7rem .6rem;border-top:1px solid #f1f4f9;border-bottom:1px solid #f1f4f9}
+    .table .w-60{max-width:60ch}
+
+    /* Modal */
+    .tc-modal{position:fixed;inset:0;z-index:1000}
+    .tc-modal.hidden{display:none}
+    .tc-modal-backdrop{position:absolute;inset:0;background:rgba(17,24,39,.45);backdrop-filter:blur(2px)}
+    .tc-modal-card{position:relative;z-index:1;margin:6vh auto;background:#fff;border-radius:16px;max-width:720px;box-shadow:0 24px 64px rgba(10,20,50,.2)}
+    .tc-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eef1f6}
+    .tc-modal-body{padding:16px}
+    .tc-modal-foot{display:flex;gap:.6rem;justify-content:flex-end;padding:12px 16px;border-top:1px solid #eef1f6}
+    .icon-btn{background:#f2f5fb;border:none;border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:22px;line-height:1}
+    .tc-textarea{width:100%;min-height:120px;border:1px solid var(--border);border-radius:12px;padding:.8rem}
+    .tc-sugg{display:block;width:100%;text-align:left;border:1px solid #e9edf5;background:#f8fafc;border-radius:10px;padding:.55rem .7rem;margin-bottom:.45rem}
+    .tc-flex{display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-top:.6rem}
+    .tc-saved{background:#fafbfe;border:1px solid #eef1f6;border-radius:12px;padding:.6rem}
+    .tc-saved-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+    .tc-saved-list{display:grid;gap:.35rem;max-height:160px;overflow:auto}
+    .tc-saved-item{display:flex;gap:.4rem;align-items:center}
+    .tc-saved-item .ghost{border:1px dashed #d9e2f0;border-radius:10px;padding:.35rem .55rem;background:#fff}
+    .tc-schedule .lbl{font-size:.85rem;color:#6b7280;margin-bottom:.25rem;display:block}
+  </style>
+</head>
+<body>
+
+  <div class="page-head">
+    <h1 class="title xl">Top Comments</h1>
+    <p class="sub">Quick actions, reply helper, and the full sentiment table.</p>
+  </div>
+
+  <div class="tc-toolbar">
+    <input id="tc-search" class="tc-input" type="text" placeholder="Search comments…">
+    <select id="tc-sentiment" class="tc-select">
+      <option value="">All sentiments</option>
+      <option value="positive">Positive</option>
+      <option value="neutral">Neutral</option>
+      <option value="negative">Negative</option>
+    </select>
+    <button id="tc-reset" class="btn ghost">Reset</button>
+  </div>
+
+  <!-- KPI ribbon -->
+  <div class="tc-kpis">
+    <div class="tc-kpi"><div class="tc-kpi-label">Total</div><div class="tc-kpi-value">{{ k.total|default(0) }}</div></div>
+    <div class="tc-kpi"><div class="tc-kpi-label">Avg reacts</div><div class="tc-kpi-value">{{ k.avg_reacts|default(0) }}</div></div>
+    <div class="tc-kpi"><div class="tc-kpi-label">Positivity</div><div class="tc-kpi-value">{{ k.positivity|default(0) }}%</div></div>
+    <div class="tc-kpi"><div class="tc-kpi-label">Negatives</div><div class="tc-kpi-value">{{ k.negatives|default(0) }}</div></div>
+    <div class="tc-kpi"><div class="tc-kpi-label">Questions</div><div class="tc-kpi-value">{{ k.questions|default(0) }}</div></div>
+    <div class="tc-kpi"><div class="tc-kpi-label">High-eng</div><div class="tc-kpi-value">{{ k.high_eng|default(0) }}</div></div>
+    <div class="tc-kpi"><div class="tc-kpi-label">Unanswered</div><div class="tc-kpi-value">{{ k.unanswered|default(0) }}</div></div>
+  </div>
+
+  <!-- 2x2 lists -->
+  <div class="tc-grid-2x2">
+    {% for block in [
+        ('Top Reacted','top_reacted'),
+        ('Top Engaged','top_engaged'),
+        ('Top Loved','top_loved'),
+        ('Top “Haha”','top_haha')
+      ] %}
+    {% set title, key = block %}
+    <div class="tc-card">
+      <div class="tc-card-head">
+        <h3 class="tc-card-title">{{ title }}</h3>
+        <div class="tc-sort">
+          <button class="chip sm tc-sort-btn active" data-sort="reactions">Reactions</button>
+          <button class="chip sm tc-sort-btn" data-sort="eng">Eng</button>
+          <button class="chip sm tc-sort-btn" data-sort="newest">Newest</button>
+        </div>
+      </div>
+      <div class="tc-list" id="list-{{ key }}">
+        {% set items = (lists[key] or [])[:2] %}
+        {% if not items %}
+          <div class="tc-empty">No items for current filters.</div>
+        {% else %}
+          {% for it in items %}
+            <div class="tc-item" data-react="{{ it.react }}" data-eng="{{ it.eng }}" data-ts="{{ it.ts }}">
+              <div class="tc-avatar">U</div>
+              <div class="tc-body">
+                <div class="tc-line">
+                  <div class="tc-text clamp">{{ it.text }}</div>
+                  <div class="tc-badges">
+                    <span class="pill">eng {{ it.eng }}</span>
+                    <span class="pill muted">reactions {{ it.react }}</span>
+                  </div>
+                </div>
+                <div class="tc-actions">
+                  <button class="link">Translate</button>
+                  <button class="link tc-reply-btn"
+                          data-text="{{ it.text|e }}"
+                          data-sent="{{ it.sentiment }}"
+                          data-emo="{{ it.emotion }}"
+                          data-link="{{ it.link }}">Reply</button>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Table -->
+  <div class="tc-table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>User</th><th>Comment</th><th>Sentiment</th><th>Emotion</th>
+          <th>Reactions</th><th>Engagement</th><th>Reply</th>
+        </tr>
+      </thead>
+      <tbody id="tc-table-body">
+        {% for r in rows %}
+        <tr data-sent="{{ r.sentiment }}" data-text="{{ r.comment_text|e }}">
+          <td>{{ r.user_name }}</td>
+          <td class="w-60">{{ r.comment_text }}</td>
+          <td><span class="pill {{ r.sentiment }}">{{ r.sentiment }}</span></td>
+          <td><span class="pill muted">{{ r.emotion }}</span></td>
+          <td>{{ r.total_reactions }}</td>
+          <td>{{ r.engagement_score }}</td>
+          <td>
+            <button class="btn xs tc-reply-btn"
+                    data-text="{{ r.comment_text|e }}"
+                    data-sent="{{ r.sentiment }}"
+                    data-emo="{{ r.emotion }}"
+                    data-link="{{ r.permalink_url if r.permalink_url else '' }}">Reply</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Reply modal -->
+  <div id="replyModal" class="tc-modal hidden" aria-hidden="true">
+    <div class="tc-modal-backdrop"></div>
+    <div class="tc-modal-card" role="dialog" aria-modal="true" aria-labelledby="replyTitle">
+      <div class="tc-modal-head">
+        <h3 id="replyTitle">Reply</h3>
+        <button id="replyClose" class="icon-btn">&times;</button>
+      </div>
+      <div class="tc-modal-body">
+        <div class="tc-meta"><span id="replyMeta"></span></div>
+        <div class="tc-suggs" id="suggsWrap"></div>
+        <textarea id="replyText" class="tc-textarea" placeholder="Edit your reply…"></textarea>
+
+        <div class="tc-flex">
+          <div class="tc-saved">
+            <div class="tc-saved-head">
+              <h4>Saved replies</h4>
+              <div>
+                <input id="saveText" class="tc-input sm" placeholder="Save current as template…">
+                <button id="saveReplyBtn" class="btn sm">Save</button>
+              </div>
+            </div>
+            <div id="savedList" class="tc-saved-list"></div>
+          </div>
+          <div class="tc-schedule">
+            <label class="lbl">Schedule</label>
+            <input id="schedAt" type="datetime-local" class="tc-input">
+          </div>
+        </div>
+      </div>
+      <div class="tc-modal-foot">
+        <button id="copyBtn" class="btn ghost">Copy</button>
+        <a id="openFb" class="btn ghost" target="_blank" rel="noopener">Open on Facebook</a>
+        <button id="schedBtn" class="btn primary">Schedule</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    const postId = "{{ post_id }}";
+    const q = s => document.querySelector(s);
+    const qa = s => Array.from(document.querySelectorAll(s));
+
+    // Filters
+    const search = q('#tc-search'), sentimentSel = q('#tc-sentiment');
+    const tableRows = qa('#tc-table-body tr');
+    function applyFilters(){
+      const term = (search.value || '').toLowerCase().trim();
+      const sent = sentimentSel.value;
+      tableRows.forEach(tr=>{
+        const text=(tr.dataset.text||'').toLowerCase(), s=tr.dataset.sent||'';
+        tr.style.display = ((!term || text.includes(term)) && (!sent || s.startsWith(sent))) ? '' : 'none';
+      });
+    }
+    search.addEventListener('input', applyFilters);
+    sentimentSel.addEventListener('change', applyFilters);
+    q('#tc-reset').addEventListener('click', ()=>{search.value=''; sentimentSel.value=''; applyFilters();});
+
+    // Sort chips on lists
+    qa('.tc-card').forEach(card=>{
+      const list = card.querySelector('.tc-list');
+      card.querySelectorAll('.tc-sort-btn').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          card.querySelectorAll('.tc-sort-btn').forEach(x=>x.classList.remove('active'));
+          b.classList.add('active');
+          const how=b.dataset.sort;
+          const items=[...list.querySelectorAll('.tc-item')];
+          items.sort((a,c)=>{
+            if(how==='reactions') return (+c.dataset.react)-(+a.dataset.react);
+            if(how==='eng') return (+c.dataset.eng)-(+a.dataset.eng);
+            if(how==='newest') return (new Date(c.dataset.ts) - new Date(a.dataset.ts));
+            return 0;
+          });
+          items.forEach(it=>list.appendChild(it));
+        });
+      });
+    });
+
+    // Reply modal
+    const modal=q('#replyModal'), replyText=q('#replyText'), replyMeta=q('#replyMeta'), suggsWrap=q('#suggsWrap');
+    let currentLink='';
+    function openModal(text, sent, emo, link){
+      currentLink = link || '';
+      replyText.value = text || '';
+      replyMeta.textContent = `${sent || '—'} · ${emo || '—'}`;
+      renderSuggestions(sent);
+      loadSaved();
+      modal.classList.remove('hidden'); modal.setAttribute('aria-hidden','false');
+      q('#openFb').href = currentLink || 'https://www.facebook.com/';
+    }
+    function closeModal(){ modal.classList.add('hidden'); modal.setAttribute('aria-hidden','true'); }
+    q('#replyClose').addEventListener('click', closeModal);
+    q('.tc-modal-backdrop').addEventListener('click', closeModal);
+
+    function renderSuggestions(sent){
+      const bank = {
+        positive: ["Thanks! Your support means a lot 🙌","Appreciate the love! What would you like to see next?","So glad you enjoyed this!"],
+        neutral:  ["Thanks for sharing your thoughts.","Got it — we'll pass this to the team.","Could you share a bit more detail?"],
+        negative: ["Sorry to hear this — can you DM us more details?","We’re on it — thanks for flagging.","Totally hear you. Let’s make this better."]
+      };
+      const arr = bank[(sent||'').toLowerCase()] || bank.neutral;
+      suggsWrap.innerHTML=''; arr.forEach(t=>{
+        const b=document.createElement('button'); b.className='tc-sugg'; b.textContent=t;
+        b.addEventListener('click', ()=>{ replyText.value=t; }); suggsWrap.appendChild(b);
+      });
+    }
+
+    qa('.tc-reply-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>openModal(btn.dataset.text, btn.dataset.sent, btn.dataset.emo, btn.dataset.link));
+    });
+
+    // Saved replies
+    async function loadSaved(){
+      const r = await fetch('/api/saved_replies'); const j = await r.json();
+      const box = q('#savedList'); box.innerHTML='';
+      (j.items||[]).forEach(it=>{
+        const row=document.createElement('div'); row.className='tc-saved-item';
+        row.innerHTML=`<button class="ghost">${it.text}</button>
+                       <button class="icon trash" title="Delete">&times;</button>`;
+        row.querySelector('.ghost').addEventListener('click', ()=>{ replyText.value = it.text; });
+        row.querySelector('.trash').addEventListener('click', async ()=>{
+          await fetch('/api/saved_replies/'+it.id, {method:'DELETE'}); loadSaved();
+        });
+        box.appendChild(row);
+      });
+    }
+    q('#saveReplyBtn').addEventListener('click', async ()=>{
+      const txt = q('#saveText').value.trim() || replyText.value.trim();
+      if(!txt) return;
+      await fetch('/api/saved_replies', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({text: txt})});
+      q('#saveText').value=''; loadSaved();
+    });
+
+    // Copy & schedule
+    q('#copyBtn').addEventListener('click', ()=>{ replyText.select(); document.execCommand('copy'); });
+    q('#schedBtn').addEventListener('click', async ()=>{
+      const when = q('#schedAt').value || '';
+      const txt  = replyText.value.trim();
+      if(!txt) return;
+      await fetch('/api/schedule_reply', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({post_id: "{{ post_id }}", reply: txt, when})});
+      closeModal();
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<div class="page-shell ana-root">
+  <div class="hero"><div class="hero__inner"><h1 class="hero-title">Story Builder</h1></div></div>
+
+  <div class="card p-3 mb-3">
+    <h6 class="mb-2">Highlights</h6>
+    <ul class="ana-toplist">
+      {% for h in extras.highlights %}<li>{{ h }}</li>{% endfor %}
+    </ul>
+  </div>
+
+  <form id="storyForm" method="post" action="{{ url_for('story_generate', post_id=post_id) }}">
+    <button class="btn btn-primary">Generate Share Link</button>
+  </form>
+
+  <div id="storyLink" class="mt-3"></div>
+</div>
+
+<script>
+document.getElementById('storyForm')?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const res = await fetch(e.target.action, {method:'POST'});
+  const j = await res.json();
+  document.getElementById('storyLink').innerHTML =
+    `<div class="alert alert-success">Share link ready: <a target="_blank" href="${j.url}">${j.url}</a></div>`;
+});
+</script>

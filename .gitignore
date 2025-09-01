@@ -13,3 +13,11 @@ __pycache__/
 # Mac/Windows system files
 .DS_Store
 Thumbs.db
+venv/
+__pycache__/
+*.pyc
+.env
+planner.db
+data_insights_history.json
+.pytest_cache/
+.DS_Store

@@ -1,0 +1,21 @@
+<div class="page-shell ana-root">
+  <div class="hero"><div class="hero__inner"><h1 class="hero-title">Quality & Provenance</h1></div></div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-6">
+      <div class="card p-3">
+        <h6 class="mb-2">Freshness & Coverage</h6>
+        <div>Data Freshness: <b>{{ extras.data_freshness }}</b></div>
+        <div>Coverage: <b>{{ extras.coverage_pct }}%</b></div>
+        <div>Generated: <span class="text-muted-compact">{{ extras.generated_at }}</span></div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-6">
+      <div class="card p-3">
+        <h6 class="mb-2">Model Versions</h6>
+        <div>{{ extras.model_version }}</div>
+        <div class="text-muted-compact">Document model updates here for auditability.</div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,42 @@
+<div class="page-shell ana-root">
+  <div class="hero"><div class="hero__inner"><h1 class="hero-title">Safety & Moderation</h1></div></div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-6">
+      <div class="card p-3">
+        <h6 class="mb-2">Toxicity (heuristic)</h6>
+        <div>Estimated toxic rate: <b>{{ extras.tox_rate }}%</b></div>
+        <div class="text-muted-compact">Swap for Detoxify model later for higher fidelity.</div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-6">
+      <div class="card p-3">
+        <h6 class="mb-2">High-Risk Queue</h6>
+        <ul class="ana-toplist">
+          {% for r in extras.risks %}
+            <li><b>{{ r.user }}</b> — {{ r.text[:120] }}… <span class="badge text-bg-danger">eng {{ r.eng }}</span>
+              {% if r.link %}<a target="_blank" class="btn btn-sm btn-outline-primary" href="{{ r.link }}">Reply</a>{% endif %}
+            </li>
+          {% else %}
+            <li class="text-muted-compact">No high-risk items now.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card p-3">
+        <h6 class="mb-2">Recent Toxic Samples</h6>
+        <ul class="ana-toplist">
+          {% for r in extras.tox_examples %}
+            <li><b>{{ r.user }}</b> — {{ r.text[:140] }}… <span class="badge text-bg-secondary">eng {{ r.eng }}</span>
+              {% if r.link %}<a target="_blank" class="btn btn-sm btn-outline-primary" href="{{ r.link }}">Reply</a>{% endif %}
+            </li>
+          {% else %}
+            <li class="text-muted-compact">None spotted recently.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

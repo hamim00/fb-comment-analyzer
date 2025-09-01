@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="ana-layout">
+  <!-- Sidebar -->
+  <aside class="ana-sidebar" data-collapsed="0">
+    <div class="ana-side-top">
+      <button id="anaSidebarToggle" class="ana-burger" title="Toggle menu" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="ana-side-title">Insights</div>
+    </div>
+
+    <!-- Back to Posts (shows only when expanded) -->
+    <div class="ana-side-head back-posts">
+      <a class="btn btn-light w-100" href="{{ url_for('show_posts') }}">← Back to Posts</a>
+    </div>
+
+    <nav class="ana-sidenav">
+      <a class="ana-navlink {{ 'active' if view == 'overview' }}" href="{{ url_for('analyze_view', post_id=post_id, view='overview') }}">Overview</a>
+      <a class="ana-navlink {{ 'active' if view == 'deep' }}" href="{{ url_for('analyze_view', post_id=post_id, view='deep') }}">Deep Analysis</a>
+      <a class="ana-navlink {{ 'active' if view == 'top_comments' }}" href="{{ url_for('analyze_view', post_id=post_id, view='top_comments') }}">Top Comments</a>
+      <a class="ana-navlink {{ 'active' if view == 'content_intel' }}" href="{{ url_for('analyze_view', post_id=post_id, view='content_intel') }}">Content Intelligence</a>
+      <a class="ana-navlink {{ 'active' if view == 'safety' }}" href="{{ url_for('analyze_view', post_id=post_id, view='safety') }}">Safety & Moderation</a>
+      <a class="ana-navlink {{ 'active' if view == 'benchmark' }}" href="{{ url_for('analyze_view', post_id=post_id, view='benchmark') }}">Benchmark & Percentiles</a>
+      <a class="ana-navlink {{ 'active' if view == 'quality' }}" href="{{ url_for('analyze_view', post_id=post_id, view='quality') }}">Quality & Provenance</a>
+      <a class="ana-navlink {{ 'active' if view == 'story' }}" href="{{ url_for('analyze_view', post_id=post_id, view='story') }}">Story Builder</a>
+      <a class="ana-navlink {{ 'active' if view == 'planner' }}" href="{{ url_for('analyze_view', post_id=post_id, view='planner') }}">Content Planner</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="ana-main">
+    <header class="ana-pagehead">
+      <div>
+        <h2 class="page-title">{{ view_title }}</h2>
+        {% if has_error %}
+          <p class="text-muted-compact">No comments found for this post.</p>
+        {% endif %}
+      </div>
+      <div></div>
+    </header>
+
+    <!-- View content -->
+    <section class="ana-pagebody">
+      {% include "views/" + view + ".html" %}
+    </section>
+  </main>
+</div>
+
+<style>
+/* Layout + sidebar */
+.ana-layout{ display:grid; grid-template-columns: 250px 1fr; gap:0; }
+.ana-sidebar{ height:100%; position:sticky; top:0; padding:12px 10px; border-right:1px solid var(--border); background:var(--surface-2); }
+.ana-main{ min-height:100vh; padding:16px; }
+
+.ana-sidebar[data-collapsed="1"]{ width:64px; grid-column: auto; overflow:hidden; }
+.ana-sidebar[data-collapsed="1"] .ana-side-title{ display:none; }
+.ana-sidebar[data-collapsed="1"] .ana-sidenav .ana-navlink{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+.back-posts { margin: .5rem .5rem 0 .5rem; }
+.ana-sidebar[data-collapsed="1"] .back-posts { display:none; }
+
+.ana-burger{ display:inline-flex; flex-direction:column; gap:4px; padding:8px; border-radius:10px; background:var(--surface); border:1px solid var(--border); }
+.ana-burger span{ width:18px; height:2px; background:#555; display:block; border-radius:2px; }
+
+.ana-side-top{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.ana-side-title{ font-weight:800; letter-spacing:.2px; }
+
+.ana-sidenav{ display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+.ana-navlink{ padding:.55rem .7rem; border-radius:10px; color:inherit; text-decoration:none; border:1px solid transparent; }
+.ana-navlink:hover{ background:var(--surface); border-color:var(--border); }
+.ana-navlink.active{ background:var(--surface); border-color:var(--border-strong, var(--border)); font-weight:700; }
+
+.ana-pagehead{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:12px; }
+.page-title{ margin:0; }
+</style>
+
+<script>
+(function(){
+  // sidebar collapse flag so CSS can hide "Back to Posts"
+  const sb  = document.querySelector('.ana-sidebar');
+  const btn = document.getElementById('anaSidebarToggle');
+  if (sb && btn){
+    btn.addEventListener('click', ()=>{
+      const now = sb.getAttribute('data-collapsed') === '1' ? '0' : '1';
+      sb.setAttribute('data-collapsed', now);
+    });
+  }
+})();
+</script>
+
+{% endblock %}

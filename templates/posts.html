@@ -122,12 +122,11 @@
              href="{{ post.permalink_url }}" target="_blank" rel="noopener">View on Facebook</a>
 
            
-            <a
-              href="http://localhost:8501/?fb_token={{ access_token | urlencode }}&post_url={{ post.permalink_url | urlencode }}"
-              target="_blank" rel="noopener"
-              class="btn btn-sm btn-gradient">
+            <a class="btn btn-primary btn-sm"
+              href="{{ url_for('analyze_view', post_id=post.id, view='overview') }}">
               Analyze This Post
             </a>
+
         </div>
 
       </div>

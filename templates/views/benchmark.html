@@ -1,0 +1,17 @@
+<div class="page-shell ana-root">
+  <div class="hero"><div class="hero__inner"><h1 class="hero-title">Benchmark & Percentiles</h1></div></div>
+
+  <div class="card p-3">
+    <h6 class="mb-2">Where this post stands (vs last {{ extras.count_history }} posts)</h6>
+    <div class="row g-3">
+      {% for k,v in extras.percentiles.items() %}
+        <div class="col-6 col-md-3">
+          <div class="card p-3">
+            <div class="small text-muted">{{ k }}</div>
+            <div class="h4">{{ v if v is not none else '—' }}<span class="small text-muted"> pct</span></div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

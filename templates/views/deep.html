@@ -1,0 +1,444 @@
+<div class="page-shell ana-root">
+  <div class="hero ana-hero">
+    <div class="hero__inner">
+      <div>
+        <h1 class="hero-title">Deep Analysis</h1>
+        <p class="hero-subtitle">Momentum, hourly mood, emotion spectrum, reactions, languages & advanced time insights.</p>
+      </div>
+
+      <!-- Time window controls -->
+      <div class="ana-timebar">
+        <select id="winPreset" class="form-select">
+          <option value="all">All time</option>
+          <option value="3h">Last 3 hours</option>
+          <option value="6h">Last 6 hours</option>
+          <option value="12h">Last 12 hours</option>
+          <option value="24h">Last 24 hours</option>
+          <option value="3d">Last 3 days</option>
+          <option value="7d" selected>Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <input type="datetime-local" id="winStart" class="form-control" style="display:none">
+        <input type="datetime-local" id="winEnd"   class="form-control" style="display:none">
+        <button class="btn" id="winApply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 1: Momentum + Hourly mix -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xxl-6">
+      <div class="card p-3 ana-reveal">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-2">Comments Over Time</h6>
+          {% if (data.kpis or {}).best_hour is not none %}
+            <span class="badge text-bg-light">Best hour: {{ "%02d"|format(data.kpis.best_hour) }}:00 UTC</span>
+          {% endif %}
+        </div>
+        <div class="chart-wrap" style="height:260px;">
+          <canvas id="deep_timeline"></canvas>
+        </div>
+        <small class="text-muted-compact">Gray dashed line = fitted decay; τ (tau) in bins shown on hover.</small>
+      </div>
+    </div>
+
+    <div class="col-12 col-xxl-6">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Hourly Sentiment Mix</h6>
+        <div class="chart-wrap" style="height:260px;">
+          <canvas id="deep_hourly"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Sentiment + Emotions + Reactions -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xxl-4">
+      <div class="card p-3 ana-reveal">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-2">Sentiment Share</h6>
+          <small class="text-muted-compact">Exact values on hover</small>
+        </div>
+        <div class="chart-wrap" style="height:240px;">
+          <canvas id="deep_sentiment"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xxl-4">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Emotion Profile</h6>
+        <div class="chart-wrap" style="height:240px;">
+          <canvas id="deep_emotions"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xxl-4">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Reactions Mix</h6>
+        <div class="chart-wrap" style="height:240px;">
+          <canvas id="deep_reactions"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Languages + Keywords -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xxl-5">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Language Mix</h6>
+        <div class="chart-wrap" style="height:240px;">
+          <canvas id="deep_languages"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xxl-7">
+      <div class="card p-3 ana-reveal">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-2">Top Keywords</h6>
+          <small class="text-muted-compact">Naive tokenization; excludes stop-words.</small>
+        </div>
+        <div class="kw-cloud" id="kwCloud"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 4: Advanced time insights -->
+  <div class="row g-3">
+    <div class="col-12 col-xxl-6">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Engagement Decay & Half-life</h6>
+        <div class="chart-wrap" style="height:250px;">
+          <canvas id="deep_decay"></canvas>
+        </div>
+        <div class="mt-2 small text-muted-compact">
+          <span id="halfLife">Half-life: —</span> ·
+          <span id="tFirst10">Time to first 10 comments: —</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xxl-6">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Reaction Rate vs Age (hours since first comment)</h6>
+        <div class="chart-wrap" style="height:250px;">
+          <canvas id="deep_reactcurve"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 5: Spikes & Contagion -->
+  <div class="row g-3 mt-3">
+    <div class="col-12 col-xxl-6">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Emotion Spikes (z&gt;2)</h6>
+        <ul id="spikeList" class="ana-list"></ul>
+      </div>
+    </div>
+
+    <div class="col-12 col-xxl-6">
+      <div class="card p-3 ana-reveal">
+        <h6 class="mb-2">Sentiment Contagion (lift vs baseline)</h6>
+        <table class="table table-sm ana-heat">
+          <thead>
+            <tr>
+              <th></th>
+              <th>→ Positive</th><th>→ Neutral</th><th>→ Negative</th>
+            </tr>
+          </thead>
+          <tbody id="contagionBody"></tbody>
+        </table>
+        <small class="text-muted-compact">Lift &gt; 1 means “next sentiment” appears more than baseline following the previous sentiment within 30 minutes.</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<style>
+.ana-timebar{ display:flex; gap:.5rem; align-items:center; }
+.ana-timebar .form-select, .ana-timebar .form-control{ min-width:170px; }
+.chart-wrap{ position:relative; width:100%; }
+.kw-cloud{ display:flex; flex-wrap:wrap; gap:.45rem; }
+.kw-cloud .kw{ padding:.35rem .55rem; border:1px solid var(--border); background:var(--surface); border-radius:999px; font-weight:600; letter-spacing:.1px; }
+.ana-list{ margin:0; padding-left:1rem; }
+.ana-reveal{ opacity:0; transform:translateY(8px); transition:opacity .4s ease, transform .4s ease; }
+.ana-reveal._in{ opacity:1; transform:none; }
+
+/* simple heat coloring */
+.ana-heat td[data-val]{ text-align:center; font-weight:700; }
+.ana-heat td[data-val]::after{ content: attr(data-val); }
+</style>
+<script>
+const SERVER_TS = {{ server_ts|tojson }};
+
+(function () {
+  // Prevent double init
+  if (window.__anaDeepRendered) return;
+  window.__anaDeepRendered = true;
+
+  const POST_ID = {{ post_id|tojson }};
+  const D0 = {{ data|tojson }};       // server-side snapshot (compute_insights)
+  const KW0 = D0.keywords_all || [];
+
+  // ------- helpers -------
+  function revealOnScroll() {
+    const rev = document.querySelectorAll('.ana-reveal');
+    const obs = new IntersectionObserver(
+      (es) => es.forEach((e) => {
+        if (e.isIntersecting) { e.target.classList.add('_in'); obs.unobserve(e.target); }
+      }),
+      { threshold: 0.15 }
+    );
+    rev.forEach((el) => obs.observe(el));
+  }
+
+  function paintKeywords(list) {
+    const box = document.getElementById('kwCloud'); box.innerHTML = '';
+    (list || []).forEach((k) => {
+      const s = document.createElement('span');
+      s.className = 'kw';
+      s.textContent = `${k.word} · ${k.count}`;
+      box.appendChild(s);
+    });
+    if (!box.children.length) {
+      const s = document.createElement('small');
+      s.className = 'text-muted-compact';
+      s.textContent = 'No keywords extracted.';
+      box.appendChild(s);
+    }
+  }
+
+  // Lazy load Chart.js, then run cb
+  function loadChartJs(cb) {
+    if (window.Chart) return cb();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+    s.onload = cb;
+    document.head.appendChild(s);
+  }
+
+  // Create a frozen (non-resizing) chart
+  function frozenChart(canvasId, cfg, heightPx) {
+    const el = document.getElementById(canvasId);
+    if (!el) return null;
+    const wrap = el.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const wCSS = wrap.clientWidth;
+    const hCSS = heightPx || wrap.clientHeight || 240;
+    el.width = Math.max(360, Math.floor(wCSS * dpr));
+    el.height = Math.floor(hCSS * dpr);
+    el.style.width = wCSS + 'px';
+    el.style.height = hCSS + 'px';
+    cfg.options = Object.assign({ responsive: false, animation: false }, cfg.options || {});
+    // extra safety
+    Chart.defaults.animation = false;
+    Chart.defaults.responsiveAnimationDuration = 0;
+    return new Chart(el, cfg);
+  }
+
+  // Charts (kept as variables so we can destroy on Apply)
+  let chTimeline, chHourly, chSent, chEmo, chReact, chLang, chDecay, chRC;
+
+  function initFrom(payload) {
+    const d = payload.data || D0;
+    const ts = payload.ts || {};
+
+    // TIMELINE (counts + decay fit)
+    (function () {
+      const L = (ts.timeline || {}).labels || (d.timeline || {}).labels || [];
+      const V = (ts.timeline || {}).values || (d.timeline || {}).values || [];
+      const F = (ts.timeline || {}).fit || new Array(V.length).fill(null);
+      const cfg = {
+        type: 'line',
+        data: {
+          labels: L,
+          datasets: [
+            { label: 'Comments', data: V, tension: .3, borderWidth: 2, fill: true, backgroundColor: 'rgba(54,162,235,.25)', pointRadius: 0 },
+            { label: 'Decay fit', data: F, tension: .3, borderDash: [5, 5], borderWidth: 2, pointRadius: 0 }
+          ]
+        },
+        options: { plugins: { legend: { position: 'bottom' } }, elements: { point: { radius: 0 } }, scales: { x: { display: false }, y: { display: false } } }
+      };
+      chTimeline = frozenChart('deep_timeline', cfg, 260);
+
+      const half = (ts.half_life_hours != null) ? ts.half_life_hours : null;
+      const t10  = (ts.t_first10_hours != null) ? ts.t_first10_hours : null;
+      document.getElementById('halfLife').textContent = 'Half-life: ' + (half != null ? (half + 'h') : '—');
+      document.getElementById('tFirst10').textContent = 'Time to first 10 comments: ' + (t10 != null ? (t10 + 'h') : '—');
+    })();
+
+    // HOURLY SENTIMENT (stacked)
+    (function () {
+      const H = d.hourly || { labels: [], pos: [], neu: [], neg: [] };
+      const cfg = {
+        type: 'bar',
+        data: {
+          labels: H.labels || [],
+          datasets: [
+            { label: 'Positive', data: H.pos || [] },
+            { label: 'Neutral', data: H.neu || [] },
+            { label: 'Negative', data: H.neg || [] },
+          ]
+        },
+        options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: 'rgba(0,0,0,.06)' } } } }
+      };
+      chHourly = frozenChart('deep_hourly', cfg, 260);
+    })();
+
+    // SENTIMENT DONUT (center label)
+    (function () {
+      const S = d.sentiment || { labels: [], values: [] };
+      const centerText = {
+        id: 'centerText',
+        afterDraw(c) {
+          const { width, height, ctx } = c;
+          const total = (S.values || []).reduce((a, b) => a + b, 0) || 0;
+          const pos = (S.labels || []).reduce((n, l, i) => l.toLowerCase().includes('pos') ? n + (S.values[i] || 0) : n, 0);
+          const pct = total ? Math.round(pos / total * 100) : 0;
+          ctx.save(); ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,.82)';
+          ctx.font = '600 14px system-ui'; ctx.fillText('Positivity', width / 2, height / 2 - 8);
+          ctx.font = '800 22px system-ui'; ctx.fillText(pct + '%', width / 2, height / 2 + 16);
+          ctx.restore();
+        }
+      };
+      const cfg = { type: 'doughnut', plugins: [centerText], data: { labels: S.labels || [], datasets: [{ data: S.values || [] }] }, options: { plugins: { legend: { position: 'bottom' } }, cutout: '65%' } };
+      chSent = frozenChart('deep_sentiment', cfg, 240);
+    })();
+
+    // EMOTION RADAR
+    (function () {
+      const E = d.emotions || { labels: [], values: [] };
+      const cfg = { type: 'radar', data: { labels: E.labels || [], datasets: [{ label: 'Emotion', data: E.values || [] }] }, options: { plugins: { legend: { display: false } }, scales: { r: { angleLines: { color: 'rgba(0,0,0,.06)' }, grid: { color: 'rgba(0,0,0,.06)' } } } } };
+      chEmo = frozenChart('deep_emotions', cfg, 240);
+    })();
+
+    // REACTIONS MIX
+    (function () {
+      const R = d.reactions || { labels: [], values: [] };
+      const cfg = { type: 'bar', data: { labels: R.labels || [], datasets: [{ label: 'Reactions', data: R.values || [] }] }, options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(0,0,0,.06)' } } } } };
+      chReact = frozenChart('deep_reactions', cfg, 240);
+    })();
+
+    // LANGUAGE MIX
+    (function () {
+      const L = d.languages || { labels: [], values: [] };
+      const cfg = { type: 'bar', data: { labels: L.labels || [], datasets: [{ label: 'Count', data: L.values || [] }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(0,0,0,.06)' } }, y: { grid: { display: false } } } } };
+      chLang = frozenChart('deep_languages', cfg, 240);
+    })();
+
+    // DECAY (duplicate of timeline, separate canvas)
+    (function () {
+      const T = ts.timeline || {};
+      const cfg = {
+        type: 'line',
+        data: { labels: T.labels || [], datasets: [
+          { label: 'Comments', data: T.values || [], tension: .3, borderWidth: 2, fill: true, backgroundColor: 'rgba(54,162,235,.25)', pointRadius: 0 },
+          { label: 'Decay fit', data: T.fit || [], tension: .3, borderDash: [5, 5], borderWidth: 2, pointRadius: 0 }
+        ]},
+        options: { plugins: { legend: { position: 'bottom' } }, elements: { point: { radius: 0 } }, scales: { x: { display: false }, y: { display: false } } }
+      };
+      chDecay = frozenChart('deep_decay', cfg, 250);
+    })();
+
+    // REACTION CURVE
+    (function () {
+      const RC = ts.reaction_curve || { labels: [], values: [] };
+      const cfg = { type: 'line', data: { labels: (RC.labels || []).map(String), datasets: [{ label: 'Avg reactions', data: RC.values || [], tension: .3, borderWidth: 2, pointRadius: 0 }] }, options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(0,0,0,.06)' } } } } };
+      chRC = frozenChart('deep_reactcurve', cfg, 250);
+    })();
+
+    // SPIKES
+    (function () {
+      const UL = document.getElementById('spikeList'); UL.innerHTML = '';
+      const S = (payload.ts || {}).spikes || [];
+      if (!S.length) { UL.innerHTML = '<li class="text-muted-compact">No spikes detected.</li>'; return; }
+      S.forEach((s) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<b>${s.emotion}</b> spike (z=${s.z}) at <code>${s.t}</code> — count ${s.value}`;
+        UL.appendChild(li);
+      });
+    })();
+
+    // CONTAGION HEAT
+    (function () {
+      const ts = payload.ts || {};
+      const L = (ts.contagion || {}).labels || ['positive', 'neutral', 'negative'];
+      const M = (ts.contagion || {}).matrix || [[1, 1, 1], [1, 1, 1], [1, 1, 1]];
+      const TB = document.getElementById('contagionBody'); TB.innerHTML = '';
+      function color(val) {
+        const v = Math.max(0.5, Math.min(3, val));
+        const hue = v >= 1 ? 140 : 0; // green if lift>1 else red
+        const sat = Math.round(40 + 30 * Math.abs(v - 1));
+        const light = 92 - Math.round(25 * Math.abs(v - 1));
+        return `hsl(${hue} ${sat}% ${light}%)`;
+      }
+      L.forEach((rowLabel, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<th>${rowLabel} →</th>`;
+        M[i].forEach((v) => {
+          const td = document.createElement('td');
+          td.setAttribute('data-val', v.toFixed(2));
+          td.style.background = color(v);
+          tr.appendChild(td);
+        });
+        TB.appendChild(tr);
+      });
+    })();
+
+    // keywords
+    paintKeywords((d.keywords_all || KW0));
+  }
+
+  // Initial render: AFTER Chart.js loads
+  revealOnScroll();
+  loadChartJs(() => { initFrom({ data: D0, ts: SERVER_TS || {} }); });
+
+
+  // ------- Time window controls -------
+  const preset = document.getElementById('winPreset');
+  const sInp = document.getElementById('winStart');
+  const eInp = document.getElementById('winEnd');
+  const apply = document.getElementById('winApply');
+
+  preset.addEventListener('change', () => {
+    const custom = preset.value === 'custom';
+    sInp.style.display = custom ? '' : 'none';
+    eInp.style.display = custom ? '' : 'none';
+  });
+
+  apply.addEventListener('click', async () => {
+    const p = new URLSearchParams({ post_id: POST_ID });
+    const v = preset.value;
+    if (v === 'all') {
+      // no range params
+    } else if (v === 'custom') {
+      if (sInp.value) p.set('start', new Date(sInp.value).toISOString());
+      if (eInp.value) p.set('end', new Date(eInp.value).toISOString());
+    } else {
+      p.set('range', v);
+    }
+
+    apply.disabled = true; apply.textContent = 'Loading…';
+    try {
+      const res = await fetch(`/api/analyze_window?${p.toString()}`);
+      const js = await res.json();
+
+      // nuke old charts to avoid animation/reflow
+      [chTimeline, chHourly, chSent, chEmo, chReact, chLang, chDecay, chRC].forEach((c) => { if (c) try { c.destroy(); } catch (_) {} });
+
+      // ensure Chart.js is loaded (should be, but safe)
+      loadChartJs(() => initFrom(js));
+    } finally {
+      apply.disabled = false; apply.textContent = 'Apply';
+    }
+  });
+
+})();
+</script>
