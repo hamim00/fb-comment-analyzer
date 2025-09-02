@@ -1,4 +1,4 @@
-# backend.py — polished Flask 3 app
+# backend.py — polished Flask 3 app (UI overhaul + deep analytics)
 from __future__ import annotations
 import os, io, re, json, time, secrets, hashlib, sqlite3
 from collections import Counter
@@ -13,9 +13,9 @@ from flask import (
     jsonify, render_template, Response
 )
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # ENV & APP
-# -----------------------------------------------------------------------------
+# =============================================================================
 load_dotenv()
 FB_APP_ID       = os.getenv("FB_APP_ID")
 FB_APP_SECRET   = os.getenv("FB_APP_SECRET")
@@ -27,8 +27,18 @@ app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
 # -----------------------------------------------------------------------------
-# UTILS
+# JINJA FILTERS & UTILITIES
 # -----------------------------------------------------------------------------
+def _abbr(n):
+    try: n = int(n or 0)
+    except Exception: return "0"
+    for thresh, suf in ((1_000_000_000,"B"),(1_000_000,"M"),(1_000,"K")):
+        if n >= thresh:
+            s = f"{n/thresh:.1f}".rstrip("0").rstrip(".")
+            return f"{s}{suf}"
+    return str(n)
+app.jinja_env.filters["abbr"] = _abbr
+
 def parse_dt(v):
     """Best-effort to pandas Timestamp (UTC)."""
     if v is None:
@@ -40,19 +50,8 @@ def parse_dt(v):
     except Exception:
         return pd.NaT
 
-def _abbr(n):
-    try: n = int(n or 0)
-    except Exception: return "0"
-    for thresh, suf in ((1_000_000_000,"B"),(1_000_000,"M"),(1_000,"K")):
-        if n >= thresh:
-            s = f"{n/thresh:.1f}".rstrip("0").rstrip(".")
-            return f"{s}{suf}"
-    return str(n)
-
-app.jinja_env.filters["abbr"] = _abbr
-
 # -----------------------------------------------------------------------------
-# FACEBOOK: post list (choose_account -> show_posts)
+# FACEBOOK POSTS (list page)
 # -----------------------------------------------------------------------------
 def fetch_facebook_posts(token: str, page_id: str):
     url = f"https://graph.facebook.com/v19.0/{page_id}/posts"
@@ -167,7 +166,7 @@ def logout():
     return redirect(url_for("index"))
 
 # -----------------------------------------------------------------------------
-# COMMENT FETCH + ML
+# COMMENT FETCH + MODELS
 # -----------------------------------------------------------------------------
 from fetch_comments import fetch_comments       # must include permalink_url if possible
 from model_utils import load_sentiment_model, load_emotion_model
@@ -293,12 +292,13 @@ def compute_insights(df: pd.DataFrame):
                  "eng": int(r['engagement_score']), "react": int(r['total_reactions']),
                  "emotion": r['emotion'], "link": r.get('permalink_url', '')}
                 for _,r in x.head(k).iterrows()]
-    top_haha     = pick_rows(df.sort_values('haha_count', ascending=False).query("haha_count > 0"), 5)
-    top_reacted  = pick_rows(df.sort_values('total_reactions', ascending=False), 5)
-    top_engaged  = pick_rows(df.sort_values('engagement_score', ascending=False), 5)
-    top_pos      = pick_rows(df[df['sentiment'].str.startswith('pos', na=False)].sort_values('engagement_score', ascending=False), 3)
-    top_neg      = pick_rows(df[df['sentiment'].str.startswith('neg', na=False)].sort_values('engagement_score', ascending=False), 3)
-    examples     = {"positive": top_pos, "negative": top_neg}
+    top_loved   = pick_rows(df.sort_values('love_count',  ascending=False).query("love_count > 0"), 5)
+    top_haha    = pick_rows(df.sort_values('haha_count',  ascending=False).query("haha_count > 0"), 5)
+    top_reacted = pick_rows(df.sort_values('total_reactions', ascending=False), 5)
+    top_engaged = pick_rows(df.sort_values('engagement_score', ascending=False), 5)
+    top_pos     = pick_rows(df[df['sentiment'].str.startswith('pos', na=False)].sort_values('engagement_score', ascending=False), 3)
+    top_neg     = pick_rows(df[df['sentiment'].str.startswith('neg', na=False)].sort_values('engagement_score', ascending=False), 3)
+    examples    = {"positive": top_pos, "negative": top_neg}
 
     risk = (df[df['sentiment'].str.startswith('neg', na=False)]
             .query("engagement_score >= @df.engagement_score.quantile(0.75)")
@@ -332,12 +332,11 @@ def compute_insights(df: pd.DataFrame):
         "reactions": react_mix,
         "timeline": timeline,
         "hourly": hourly,
-        "top_commenters_count": [],
-        "top_commenters_eng":  [],
         "keywords_all": keywords_all,
         "keywords_pos": keywords_pos,
         "keywords_neg": keywords_neg,
         "examples": examples,
+        "top_loved": top_loved,
         "top_haha": top_haha,
         "top_reacted": top_reacted,
         "top_engaged": top_engaged,
@@ -345,7 +344,7 @@ def compute_insights(df: pd.DataFrame):
     }
 
 # -----------------------------------------------------------------------------
-# History & baselines (for deltas)
+# HISTORY / BENCHMARKS / QUALITY
 # -----------------------------------------------------------------------------
 HIST_PATH = os.path.join(os.path.dirname(__file__), "data_insights_history.json")
 
@@ -390,15 +389,97 @@ def build_highlights(data: dict):
     return out
 
 # -----------------------------------------------------------------------------
-# Extra analytics for Top Comments (KPIs + 4 lists)
+# TOP COMMENTS — INVESTOR HOOKS
 # -----------------------------------------------------------------------------
-def compute_top_comments_panel(df: pd.DataFrame, insights: dict):
-    if df is None or df.empty:
-        return {"kpis": {}, "lists": {"top_reacted":[],"top_engaged":[],"top_loved":[],"top_haha":[]}}
+import hashlib as _hl
 
-    # base cols
+def _row_cid(u: str, t: str) -> str:
+    """Stable id when comment_id not present."""
+    base = f"{u or ''}|{t or ''}"
+    return _hl.md5(base.encode("utf-8", errors="ignore")).hexdigest()
+
+def _pareto_share(df: pd.DataFrame, k: int = 10) -> float:
+    if df.empty or 'engagement_score' not in df.columns: return 0.0
+    d = df.sort_values('engagement_score', ascending=False)
+    top = float(d.head(k)['engagement_score'].sum())
+    tot = float(df['engagement_score'].sum())
+    return round(100.0 * top / max(1.0, tot), 1)
+
+def _shingles(s: str, k: int = 3) -> set:
+    s = re.sub(r"\s+", " ", str(s or "").lower()).strip()
+    if not s: return set()
+    if len(s) <= k: return {s}
+    return {s[i:i+k] for i in range(len(s)-k+1)}
+
+def _jaccard(a: set, b: set) -> float:
+    return len(a & b) / max(1, len(a | b))
+
+def _similar_groups_from_df(df: pd.DataFrame, topn: int = 200, thr: float = 0.55):
+    """Clusters near-duplicate comments by simple shingle Jaccard."""
+    if df.empty or 'comment_text' not in df.columns: return []
+    d = df.dropna(subset=['comment_text']).copy()
+    d = d[d['comment_text'].str.len() >= 12].head(topn)
+    if d.empty: return []
+    items = []
+    for _, r in d.iterrows():
+        cid = r.get('comment_id') or _row_cid(r.get('user_name'), r.get('comment_text'))
+        items.append({
+            "cid": cid,
+            "user": r.get('user_name', 'U'),
+            "text": str(r['comment_text']),
+            "eng": int(r.get('engagement_score', 0)),
+            "sh": _shingles(r['comment_text'])
+        })
+    used = set(); groups = []
+    for i, x in enumerate(items):
+        if x['cid'] in used: continue
+        g = [x]; used.add(x['cid'])
+        for j in range(i+1, len(items)):
+            y = items[j]
+            if y['cid'] in used: continue
+            if _jaccard(x['sh'], y['sh']) >= thr:
+                g.append(y); used.add(y['cid'])
+        if len(g) >= 2:
+            g_sorted = sorted(g, key=lambda z: (-z['eng'], len(z['text'])))
+            rep = g_sorted[0]
+            groups.append({
+                "rep": rep['text'],
+                "count": len(g),
+                "cids": [z['cid'] for z in g],
+                "members": [{"cid": z['cid'], "user": z['user'], "text": z['text'], "eng": z['eng']} for z in g_sorted]
+            })
+    groups.sort(key=lambda G: (-G['count'], -G['members'][0]['eng']))
+    return groups[:10]
+
+# --- Top Comments extras (fix: always provide deltas keys) ---
+# --- Top Comments extras (fixed: provide kpis + lists + deltas) ---
+def compute_top_comments_extras(post_id: str, df: pd.DataFrame, insights: dict):
+    """
+    Returns everything the Top Comments template needs:
+      - kpis: {total, avg_reacts, positivity, negatives, questions, high_eng, unanswered}
+      - lists: {top_reacted, top_engaged, top_loved, top_haha} (each item includes .sent)
+      - deltas: vs most-recent prior post snapshot (stable keys)
+      - thresholds, pareto, reply queue, question bank, influencers, similar groups
+    """
+    # ---- safe guards ----
+    if df is None or df.empty:
+        deltas = {k: 0.0 for k in (
+            "total_comments","avg_reactions_per_comment","positivity_ratio","median_engagement"
+        )}
+        return {
+            "kpis": {"total": 0, "avg_reacts": 0.0, "positivity": 0.0,
+                     "negatives": 0, "questions": 0, "high_eng": 0, "unanswered": 0},
+            "lists": {"top_reacted": [], "top_engaged": [], "top_loved": [], "top_haha": []},
+            "deltas": deltas,
+            "thresholds": {"high_engagement": 0.0, "median_engagement": 0.0},
+            "reply_coverage_questions_pct": None,
+            "pareto_top10_pct": 0.0,
+            "reply_queue": [], "question_bank": [], "influencers": [], "similar_groups": []
+        }
+
+    # ---- base derived columns ----
     for c in REACTION_COLS:
-        if c not in df.columns: df[c]=0
+        if c not in df.columns: df[c] = 0
     if 'total_reactions' not in df.columns:
         df['total_reactions'] = df[REACTION_COLS].sum(axis=1)
     if 'reply_count' not in df.columns:
@@ -406,53 +487,133 @@ def compute_top_comments_panel(df: pd.DataFrame, insights: dict):
     if 'engagement_score' not in df.columns:
         df['engagement_score'] = df['total_reactions'] + df['reply_count']
 
-    k = insights.get("kpis", {}) if insights else {}
-
+    # ---- KPI set the template expects ----
     total = int(len(df))
-    avg_reacts = float(df['total_reactions'].mean() if total else 0)
-    pos = int((df['sentiment'].astype(str).str.startswith('pos')).sum())
-    neg = int((df['sentiment'].astype(str).str.startswith('neg')).sum())
+    avg_reacts = round(float(df['total_reactions'].mean() or 0.0), 2)
+
+    sent = df['sentiment'].fillna('').str.lower()
+    pos = int(sent.str.startswith('pos').sum())
+    neg = int(sent.str.startswith('neg').sum())
     polar = pos + neg
-    positivity = round(100 * pos / max(1, polar), 1)
-    questions = int(df['comment_text'].astype(str).str.contains(r'\?', regex=True).sum())
-    high_thresh = df['engagement_score'].quantile(0.75) if total else 0
-    high_eng = int((df['engagement_score'] >= high_thresh).sum())
-    unanswered = int((df.get('reply_count', 0) == 0).sum())
+    positivity = round(100.0 * pos / max(1, polar), 1)
 
-    def _pick_rows(df_slice, cap=5):
-        return [{
-            "user": r.get('user_name',''),
-            "text": r.get('comment_text',''),
-            "sentiment": r.get('sentiment',''),
-            "emotion": r.get('emotion',''),
-            "react": int(r.get('total_reactions', 0)),
-            "eng": int(r.get('engagement_score', 0)),
-            "ts": str(r.get('created_time','')) if 'created_time' in r else '',
-            "link": r.get('permalink_url','')
-        } for _, r in df_slice.head(cap).iterrows()]
+    questions_mask = df['comment_text'].fillna("").str.contains(
+        r"\?|\b(why|what|when|how|where|which|kivabe|keno)\b", case=False, regex=True
+    )
+    questions = int(questions_mask.sum())
 
-    lists = {
-        "top_reacted": _pick_rows(df.sort_values('total_reactions', ascending=False), 5),
-        "top_engaged": _pick_rows(df.sort_values('engagement_score', ascending=False), 5),
-        "top_loved":   _pick_rows(df.sort_values('love_count', ascending=False).query("love_count > 0"), 5),
-        "top_haha":    _pick_rows(df.sort_values('haha_count', ascending=False).query("haha_count > 0"), 5),
+    hi_eng_thresh = float(df['engagement_score'].quantile(0.75)) if total else 0.0
+    high_eng = int((df['engagement_score'] >= hi_eng_thresh).sum())
+    unanswered = int((df['reply_count'] <= 0).sum())
+
+    kpis = dict(
+        total=total,
+        avg_reacts=avg_reacts,
+        positivity=positivity,
+        negatives=neg,
+        questions=questions,
+        high_eng=high_eng,
+        unanswered=unanswered
+    )
+
+    # ---- deltas vs previous post (stable keys, never missing) ----
+    hist = _history_load()
+    prev_kpis = None
+    if hist:
+        items = sorted(hist.items(), key=lambda kv: kv[1].get("ts", 0))
+        for pid, rec in reversed(items):
+            if pid != post_id and isinstance(rec, dict) and rec.get("kpis"):
+                prev_kpis = rec["kpis"]; break
+    cur_kpis = (insights or {}).get("kpis", {}) or {}
+    def _delta(key: str) -> float:
+        try:
+            return round(float(cur_kpis.get(key, 0) or 0) - float((prev_kpis or {}).get(key, 0) or 0), 2)
+        except Exception:
+            return 0.0
+    deltas = {
+        "total_comments": _delta("total_comments"),
+        "avg_reactions_per_comment": _delta("avg_reactions_per_comment"),
+        "positivity_ratio": _delta("positivity_ratio"),
+        "median_engagement": _delta("median_engagement"),
     }
 
+    # ---- helper to convert rows for cards (includes sentiment) ----
+    def _pick_rows(x: pd.DataFrame, cap=5):
+        if x is None or x.empty: return []
+        out = []
+        for _, r in x.head(cap).iterrows():
+            out.append({
+                "user": r.get('user_name','U'),
+                "text": r.get('comment_text',''),
+                "sent": r.get('sentiment',''),
+                "emo":  r.get('emotion',''),
+                "react": int(r.get('total_reactions',0)),
+                "eng": int(r.get('engagement_score',0)),
+                "link": r.get('permalink_url','')
+            })
+        return out
+
+    # ---- the 4 cards ----
+    top_reacted = _pick_rows(df.sort_values('total_reactions', ascending=False), 5)
+    top_engaged = _pick_rows(df.sort_values('engagement_score', ascending=False), 5)
+    top_loved   = _pick_rows(df.sort_values('love_count', ascending=False).query("love_count > 0"), 5)
+    top_haha    = _pick_rows(df.sort_values('haha_count', ascending=False).query("haha_count > 0"), 5)
+
+    # ---- question bank & reply coverage ----
+    q_df = df[questions_mask]
+    if not q_df.empty:
+        replied = int((q_df['reply_count'] > 0).sum())
+        reply_cov = round(100.0 * replied / max(1, int(q_df.shape[0])), 1)
+        unanswered_q = q_df[q_df['reply_count'] <= 0].sort_values('engagement_score', ascending=False).head(10)
+    else:
+        reply_cov = None
+        unanswered_q = df.iloc[0:0]
+
+    # ---- reply queue: high-engaged negatives ----
+    reply_queue = df[sent.str.startswith('neg')]
+    reply_queue = reply_queue[reply_queue['engagement_score'] >= hi_eng_thresh]
+    reply_queue = reply_queue.sort_values('engagement_score', ascending=False).head(10)
+
+    # ---- influencers ----
+    influencers = []
+    if 'user_name' in df.columns:
+        g = df.groupby('user_name').agg(
+            comments=('comment_text','count'),
+            avg_react=('total_reactions','mean'),
+            total_eng=('engagement_score','sum')
+        ).sort_values(['total_eng','comments'], ascending=False).head(8)
+        influencers = [{
+            "user": i,
+            "comments": int(r.comments),
+            "avg_reacts": round(float(r.avg_react or 0), 1),
+            "eng": int(r.total_eng)
+        } for i, r in g.iterrows()]
+
+    # ---- pareto & similar groups (reuse helpers) ----
+    pareto = _pareto_share(df, k=10)
+    sim_groups = _similar_groups_from_df(df)
+
     return {
-        "kpis": dict(
-            total=total,
-            avg_reacts=round(avg_reacts,2),
-            positivity=positivity,
-            negatives=neg,
-            questions=questions,
-            high_eng=int(high_eng),
-            unanswered=unanswered
-        ),
-        "lists": lists
+        "kpis": kpis,
+        "lists": {
+            "top_reacted": top_reacted,
+            "top_engaged": top_engaged,
+            "top_loved":   top_loved,
+            "top_haha":    top_haha,
+        },
+        "deltas": deltas,
+        "thresholds": {"high_engagement": float(hi_eng_thresh),
+                       "median_engagement": float(df['engagement_score'].median() if total else 0.0)},
+        "reply_coverage_questions_pct": reply_cov,
+        "pareto_top10_pct": pareto,
+        "reply_queue": _pick_rows(reply_queue, 10),
+        "question_bank": _pick_rows(unanswered_q, 10),
+        "influencers": influencers,
+        "similar_groups": sim_groups
     }
 
 # -----------------------------------------------------------------------------
-# In-process cache per post
+# IN-PROCESS CACHE
 # -----------------------------------------------------------------------------
 _POST_CACHE = {}
 
@@ -471,10 +632,16 @@ def _get_post_bundle(token: str, post_id: str):
     if 'created_time' in df.columns:
         df['created_time'] = df['created_time'].apply(parse_dt)
 
+    # stable per-row id for UI/bulk
+    if 'comment_id' in df.columns:
+        df['cid'] = df['comment_id'].astype(str)
+    else:
+        df['cid'] = df.apply(lambda r: _row_cid(r.get('user_name'), r.get('comment_text')), axis=1)
+
     data = compute_insights(df)
 
     cols = [
-        'user_name','comment_text','sentiment','emotion',
+        'cid','user_name','comment_text','sentiment','emotion',
         'total_reactions','engagement_score','reply_count',
         'created_time','language','permalink_url'
     ]
@@ -486,7 +653,7 @@ def _get_post_bundle(token: str, post_id: str):
     return bundle
 
 # -----------------------------------------------------------------------------
-# Deep/time analytics
+# TIME-SERIES (Deep Analysis)
 # -----------------------------------------------------------------------------
 def _parse_iso(dt_str):
     if not dt_str: return None
@@ -661,7 +828,7 @@ def analyze_view(post_id, view):
     elif view == "planner":
         extras = {"drafts": planner_list()}
     elif view == "top_comments":
-        extras = compute_top_comments_panel(df, data)
+        extras = compute_top_comments_extras(post_id, df, data)
 
     try:
         server_ts = _time_analytics(df) if df is not None and not df.empty else {}
@@ -690,8 +857,12 @@ def api_analyze():
     df = analyze_df(df)
     if 'created_time' in df.columns:
         df['created_time'] = df['created_time'].apply(parse_dt)
+    if 'comment_id' in df.columns:
+        df['cid'] = df['comment_id'].astype(str)
+    else:
+        df['cid'] = df.apply(lambda r: _row_cid(r.get('user_name'), r.get('comment_text')), axis=1)
     data = compute_insights(df)
-    cols = ['user_name','comment_text','sentiment','emotion','total_reactions',
+    cols = ['cid','user_name','comment_text','sentiment','emotion','total_reactions',
             'engagement_score','reply_count','created_time','language','permalink_url']
     have = [c for c in cols if c in df.columns]
     rows = df[have].to_dict(orient="records")
@@ -716,7 +887,7 @@ def api_analyze_window():
 
     d_ins = compute_insights(dfw)
     ts_ins = _time_analytics(dfw)
-    cols = ['user_name','comment_text','sentiment','emotion','total_reactions','engagement_score','permalink_url']
+    cols = ['cid','user_name','comment_text','sentiment','emotion','total_reactions','engagement_score','permalink_url']
     have = [c for c in cols if c in dfw.columns]
     rows_w = dfw[have].to_dict(orient="records")
     return jsonify({"data": d_ins, "rows": rows_w, "ts": ts_ins})
@@ -738,7 +909,7 @@ def export_comments_csv(post_id):
     )
 
 # -----------------------------------------------------------------------------
-# Content Intel & Safety panels
+# CONTENT INTELLIGENCE & SAFETY PANELS
 # -----------------------------------------------------------------------------
 def compute_content_intel(df: pd.DataFrame):
     def hashtags(text): return [w for w in str(text).split() if w.startswith("#")]
@@ -765,7 +936,7 @@ def compute_safety_panel(df: pd.DataFrame, insights: dict):
     return {"tox_rate": tox_rate, "tox_examples": examples, "risks": insights.get("risks", [])}
 
 # -----------------------------------------------------------------------------
-# Story share (assist mode)
+# STORY SHARE (assist mode)
 # -----------------------------------------------------------------------------
 def _sign_token(payload: dict) -> str:
     body = json.dumps(payload, sort_keys=True)
@@ -783,10 +954,9 @@ def story_share(token):
     return render_template("views/story_public.html", token=token, post_id=post_id)
 
 # -----------------------------------------------------------------------------
-# Planner + Saved Replies + Quick Schedule
+# PLANNER DB + SAVED REPLIES + BULK & SCHEDULE
 # -----------------------------------------------------------------------------
 DB_PATH = os.path.join(os.path.dirname(__file__), "planner.db")
-
 def _db():
     con = sqlite3.connect(DB_PATH); con.row_factory = sqlite3.Row
     return con
@@ -796,26 +966,29 @@ def planner_init():
     con.execute("""
     CREATE TABLE IF NOT EXISTS planned_posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      platform TEXT,
-      target   TEXT,
-      caption  TEXT,
-      hashtags TEXT,
-      media_url TEXT,
+      platform   TEXT,
+      target     TEXT,
+      caption    TEXT,
+      hashtags   TEXT,
+      media_url  TEXT,
       scheduled_at TEXT,
-      status TEXT DEFAULT 'draft',
+      status     TEXT DEFAULT 'draft',
       created_at TEXT DEFAULT (DATETIME('now'))
     )""")
     con.execute("""
     CREATE TABLE IF NOT EXISTS saved_replies (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      text TEXT NOT NULL,
-      tag  TEXT,
+      label TEXT,
+      body  TEXT,
+      category TEXT,
       created_at TEXT DEFAULT (DATETIME('now'))
     )""")
     con.commit(); con.close()
 
-try: planner_init()
-except Exception as e: print("planner_init error:", e)
+try:
+    planner_init()
+except Exception as e:
+    print("planner_init error:", e)
 
 def planner_list():
     con = _db()
@@ -848,41 +1021,69 @@ def planner_open(pid):
     return redirect("https://www.facebook.com/")
 
 # ---- Saved replies API ----
-@app.get("/api/saved_replies")
-def api_saved_replies_list():
+@app.get("/api/replies")
+def api_replies_list():
     con = _db()
-    rows = [dict(r) for r in con.execute("SELECT * FROM saved_replies ORDER BY id DESC").fetchall()]
-    con.close(); return jsonify({"items": rows})
+    rows = [dict(r) for r in con.execute("SELECT * FROM saved_replies ORDER BY created_at DESC, id DESC")]
+    con.close()
+    return jsonify({"items": rows})
 
-@app.post("/api/saved_replies")
-def api_saved_replies_add():
-    d = request.get_json(silent=True) or request.form
-    text = (d.get("text") or "").strip()
-    tag  = (d.get("tag") or "").strip()
-    if not text: return jsonify({"error":"text required"}), 400
-    con = _db(); cur = con.execute("INSERT INTO saved_replies(text, tag) VALUES(?,?)", (text, tag))
-    con.commit(); con.close()
-    return jsonify({"ok": True, "id": cur.lastrowid})
+@app.post("/api/replies")
+def api_replies_create():
+    data = request.get_json(force=True, silent=True) or {}
+    label = (data.get("label") or "Saved reply").strip()
+    body  = (data.get("body") or "").strip()
+    category = (data.get("category") or "general").strip()
+    if not body:
+        return jsonify({"error":"body required"}), 400
+    con = _db()
+    cur = con.execute("INSERT INTO saved_replies(label,body,category) VALUES(?,?,?)",
+                      (label, body, category))
+    con.commit(); rid = cur.lastrowid; con.close()
+    return jsonify({"id": rid, "ok": True})
 
-@app.delete("/api/saved_replies/<int:rid>")
-def api_saved_replies_delete(rid):
-    con = _db(); con.execute("DELETE FROM saved_replies WHERE id=?", (rid,))
+@app.delete("/api/replies/<int:rid>")
+def api_replies_delete(rid):
+    con = _db()
+    con.execute("DELETE FROM saved_replies WHERE id=?", (rid,))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
+# ---- Bulk actions (stored in session as lists) ----
+@app.post("/api/comments/bulk")
+def api_comments_bulk():
+    data = request.get_json(force=True, silent=True) or {}
+    post_id = data.get("post_id")
+    cids = data.get("cids") or []
+    action = (data.get("action") or "").lower()
+    if not post_id or not isinstance(cids, list):
+        return jsonify({"error":"bad request"}), 400
+    handled = session.get("handled_map", {})
+    cur = set(handled.get(post_id, []))
+    if action == "mark_handled":
+        cur.update(cids)
+        handled[post_id] = list(cur)
+        session["handled_map"] = handled
+        return jsonify({"ok": True, "count": len(cids)})
+    elif action == "clear_handled":
+        handled[post_id] = []
+        session["handled_map"] = handled
+        return jsonify({"ok": True})
+    return jsonify({"ok": False, "msg": "noop"})
 
 # ---- Schedule reply inline (no navigation) ----
 @app.post("/api/schedule_reply")
 def api_schedule_reply():
-    d = request.get_json(silent=True) or request.form
-    post_id = d.get("post_id")
-    reply   = (d.get("reply") or "").strip()
-    when    = d.get("when")  # ISO string or None
-    if not post_id or not reply:
-        return jsonify({"error":"post_id and reply required"}), 400
+    data = request.get_json(force=True, silent=True) or {}
+    txt = (data.get("reply") or "").strip()
+    when = (data.get("scheduled_at") or "").strip()  # ISO or freeform
+    post_id = data.get("post_id") or ""
+    if not txt:
+        return jsonify({"error":"reply required"}), 400
     con = _db()
     con.execute("""INSERT INTO planned_posts(platform,target,caption,hashtags,media_url,scheduled_at,status)
                    VALUES(?,?,?,?,?,?,?)""",
-                ("facebook", f"reply:{post_id}", reply, "", "", when or "", "scheduled"))
+                ("facebook-comment-reply", post_id, txt, "", "", when, "scheduled"))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
